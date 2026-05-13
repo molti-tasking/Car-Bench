@@ -12,16 +12,12 @@ from a2a.client import (
     ClientFactory,
 )
 from a2a.types import (
-    Message,
     SendMessageRequest,
-    StreamResponse,
     TaskState,
-    Role,
 )
-from a2a.helpers.proto_helpers import new_text_part
 from google.protobuf.json_format import MessageToDict
 
-from agentbeats.client import create_message, merge_parts
+from agentbeats.client import create_message
 from agentbeats.models import EvalRequest
 
 
@@ -30,30 +26,24 @@ class AgentFailedError(Exception):
     pass
 
 
-def parse_toml(d: dict[str, object]) -> tuple[EvalRequest, str, dict[str, str]]:
-    green = d.get("green_agent")
-    if not isinstance(green, dict) or "endpoint" not in green:
-        raise ValueError("green.endpoint is required in TOML")
-    green_endpoint: str = green["endpoint"]
+def parse_toml(d: dict[str, object]) -> tuple[EvalRequest, str]:
+    if "green_agent" in d or "participants" in d:
+        raise ValueError("Old scenario shape is unsupported; use [evaluator] and [agent_under_test].")
 
-    parts: dict[str, str] = {}
-    role_to_id: dict[str, str] = {}
+    evaluator = d.get("evaluator")
+    if not isinstance(evaluator, dict) or "endpoint" not in evaluator:
+        raise ValueError("evaluator.endpoint is required in TOML")
+    evaluator_endpoint: str = evaluator["endpoint"]
 
-    for p in d.get("participants", []):
-        if isinstance(p, dict):
-            role = p.get("role")
-            endpoint = p.get("endpoint")
-            agentbeats_id = p.get("agentbeats_id")
-            if role and endpoint:
-                parts[role] = endpoint
-            if role and agentbeats_id:
-                role_to_id[role] = agentbeats_id
+    agent_under_test = d.get("agent_under_test")
+    if not isinstance(agent_under_test, dict) or "endpoint" not in agent_under_test:
+        raise ValueError("agent_under_test.endpoint is required in TOML")
 
     eval_req = EvalRequest(
-        participants=parts,
+        agent_under_test=agent_under_test["endpoint"],
         config=d.get("config", {}) or {}
     )
-    return eval_req, green_endpoint, role_to_id
+    return eval_req, evaluator_endpoint
 
 
 def parse_parts(parts) -> tuple[list, list]:
@@ -116,14 +106,14 @@ async def main():
     toml_data = scenario_path.read_text()
     data = tomllib.loads(toml_data)
 
-    req, green_url, role_to_id = parse_toml(data)
+    req, evaluator_url = parse_toml(data)
 
     # Collect artifacts from streaming events
     collected_artifacts = []
 
     # Send message via streaming
     async with httpx.AsyncClient(timeout=300) as httpx_client:
-        resolver = A2ACardResolver(httpx_client=httpx_client, base_url=green_url)
+        resolver = A2ACardResolver(httpx_client=httpx_client, base_url=evaluator_url)
         agent_card = await resolver.get_agent_card()
         config = ClientConfig(
             httpx_client=httpx_client,
@@ -186,7 +176,7 @@ async def main():
             all_data_parts.extend(data_parts)
 
         output_data = {
-            "participants": role_to_id,
+            "agent_under_test": str(req.agent_under_test),
             "results": all_data_parts
         }
 

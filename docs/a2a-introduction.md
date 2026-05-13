@@ -227,7 +227,7 @@ Every A2A server MUST publish an **Agent Card** — a JSON document describing t
 3. **Direct configuration:** Pre-configured URLs
 
 ### 📂 Our code:
-→ **`src/purple_car_bench_agent/server.py`** — `prepare_agent_card()` function creates our AgentCard
+→ **`src/agent_under_test/server.py`** — `prepare_agent_card()` function creates our AgentCard
 
 ---
 
@@ -268,8 +268,8 @@ A single message can contain **multiple Parts** of different types.
 
 ### 📂 Our code:
 → **`src/agentbeats/client.py`** — `create_message()`, `create_message_with_parts()`, `merge_parts()`
-→ **`src/purple_car_bench_agent/car_bench_agent.py`** — Building response Parts (TextPart + DataPart)
-→ **`src/green_car_bench_agent/car_bench_evaluator.py`** — Adds Artifacts with evaluation results
+→ **`src/agent_under_test/car_bench_agent.py`** — Building response Parts (TextPart + DataPart)
+→ **`src/evaluator/car_bench_evaluator.py`** — Adds Artifacts with evaluation results
 
 ---
 
@@ -352,7 +352,7 @@ The Python SDK provides `TaskUpdater` to simplify emitting these events from you
 | **Push Notifications** | Webhook POST to client endpoint | Long-running tasks, server-to-server |
 
 ### 📂 Our code:
-→ **`src/agentbeats/green_executor.py`** — Uses `TaskUpdater` to transition task states (`working` → `complete`/`failed`)
+→ **`src/agentbeats/evaluator_executor.py`** — Uses `TaskUpdater` to transition task states (`working` → `complete`/`failed`)
 → **`src/agentbeats/client_cli.py`** — Consumes streaming events (`TaskStatusUpdateEvent`, `TaskArtifactUpdateEvent`)
 
 ---
@@ -379,7 +379,7 @@ The spec defines **12 operations**. Here's the full list with what we implement:
 ### 📂 Our code:
 → **`src/agentbeats/client.py`** — `send_message()` uses the SDK's `client.send_message()` (operations 1+2)
 → **`src/agentbeats/sync_client.py`** — `send_message_with_parts_sync()` makes raw JSON-RPC calls (operation 1)
-→ **`src/agentbeats/green_executor.py`** — `cancel()` raises `UnsupportedOperationError`
+→ **`src/agentbeats/evaluator_executor.py`** — `cancel()` raises `UnsupportedOperationError`
 
 ---
 
@@ -466,21 +466,21 @@ The spec treats agents as **standard enterprise applications**, relying on estab
 
 ```
 ┌──────────────────────────────┐
-│        AgentBeats CLI        │  ← src/agentbeats/client_cli.py
+│        A2A CLI        │  ← src/agentbeats/client_cli.py
 │  (A2A Client + Orchestrator) │  ← src/agentbeats/run_scenario.py
 └──────────┬───────────────────┘
            │ A2A (SendMessage + Streaming)
            ▼
 ┌──────────────────────────────┐
-│      Green Agent (Server)    │  ← src/green_car_bench_agent/
+│      Evaluator (Server)    │  ← src/evaluator/
 │   CAR-bench Evaluator        │
-│   [GreenExecutor extends     │
+│   [EvaluatorExecutor extends     │
 │    AgentExecutor]            │
 └──────────┬───────────────────┘
            │ A2A (SendMessage, multi-turn via context_id)
            ▼
 ┌──────────────────────────────┐
-│     Purple Agent (Server)    │  ← src/purple_car_bench_agent/
+│     Agent Under Test (Server)    │  ← src/agent_under_test/
 │   Agent Under Test           │
 │   [CARBenchAgentExecutor     │
 │    extends AgentExecutor]    │
@@ -491,11 +491,11 @@ The spec treats agents as **standard enterprise applications**, relying on estab
 
 | File | What to show | A2A Concepts |
 |------|-------------|--------------|
-| `src/purple_car_bench_agent/server.py` | `prepare_agent_card()`, server setup | Agent Card, `A2AStarletteApplication` |
-| `src/purple_car_bench_agent/car_bench_agent.py` | `execute()` method — parsing Parts, building response | Messages, Parts (Text+Data), multi-turn |
+| `src/agent_under_test/server.py` | `prepare_agent_card()`, server setup | Agent Card, `A2AStarletteApplication` |
+| `src/agent_under_test/car_bench_agent.py` | `execute()` method — parsing Parts, building response | Messages, Parts (Text+Data), multi-turn |
 | `src/agentbeats/client.py` | `send_message()`, `send_message_with_parts()` | Client → Server communication, SDK usage |
 | `src/agentbeats/sync_client.py` | `send_message_with_parts_sync()` | Raw JSON-RPC request construction |
-| `src/agentbeats/green_executor.py` | `GreenExecutor.execute()` | Task lifecycle, TaskUpdater |
+| `src/agentbeats/evaluator_executor.py` | `EvaluatorExecutor.execute()` | Task lifecycle, TaskUpdater |
 | `src/agentbeats/client_cli.py` | `event_consumer()` callback | Streaming events (SSE) |
 | `src/agentbeats/tool_provider.py` | `ToolProvider._context_ids` | Multi-turn context management |
 
@@ -505,11 +505,11 @@ The spec treats agents as **standard enterprise applications**, relying on estab
 |---------------|-------------|-----------------|
 | `A2AStarletteApplication` | ASGI app that handles JSON-RPC routing | `server.py` |
 | `DefaultRequestHandler` | Dispatches to `AgentExecutor` | `server.py` |
-| `AgentExecutor` | Interface: `execute()` + `cancel()` | `car_bench_agent.py`, `green_executor.py` |
+| `AgentExecutor` | Interface: `execute()` + `cancel()` | `car_bench_agent.py`, `evaluator_executor.py` |
 | `InMemoryTaskStore` | Task persistence (in-memory) | `server.py` |
 | `A2ACardResolver` | Fetches Agent Card from server | `client.py` |
 | `ClientFactory` / `ClientConfig` | Creates A2A client with streaming support | `client.py` |
-| `TaskUpdater` | Helper to emit task status updates | `green_executor.py` |
+| `TaskUpdater` | Helper to emit task status updates | `evaluator_executor.py` |
 | Types (`Message`, `Part`, `TextPart`, `DataPart`, `Task`, etc.) | Data model objects | Everywhere |
 
 ---
@@ -542,7 +542,7 @@ The spec treats agents as **standard enterprise applications**, relying on estab
 | **Versioning** | §3.6 | No `A2A-Version` header sent or validated | Client MUST send version; server MUST validate |
 | **`messageId`** | §4.1.4 | We generate UUIDs but don't use for idempotency | Servers MAY use `messageId` for dedup |
 | **Error handling** | §3.3.2 | Basic errors via SDK | Spec defines 9 specific A2A error types with error codes |
-| **Artifacts** | §3.7 | Green agent adds result Artifacts ✅ | Purple agent returns results in status Messages instead of Artifacts |
+| **Artifacts** | §3.7 |  The evaluator adds result Artifacts ✅ | The agent under test returns results in status Messages instead of Artifacts |
 | **Security** | §7 | No auth — agents run locally or in Docker network | Production MUST use HTTPS + auth schemes |
 | **Content-Type** | §14.1.1 | Uses `application/json` | Spec registers `application/a2a+json` media type |
 | **Well-Known URI** | §8.2 | SDK serves card at agent URL | Spec says `/.well-known/agent-card.json` |

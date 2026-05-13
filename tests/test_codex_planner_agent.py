@@ -1,13 +1,13 @@
 import json
 import unittest
 
-from purple_car_bench_agent_codex_planner.planner_agent import (
+from agent_under_test_codex_planner.planner_agent import (
     PlannerExecutorCARBenchAgentExecutor,
     _build_fallback_private_plan,
     _should_create_private_plan,
     parse_private_plan,
 )
-from purple_car_bench_agent_codex.codex_client import CodexTurnResult
+from agent_under_test_codex.codex_client import CodexTokenUsage, CodexTurnResult
 
 
 class _NoopLogger:
@@ -34,6 +34,12 @@ class _FakeExecutorOnlyClient:
             duration_ms=12.0,
             model=kwargs.get("model"),
             reasoning_effort=kwargs.get("reasoning_effort"),
+            token_usage=CodexTokenUsage(
+                input_tokens=100,
+                output_tokens=12,
+                reasoning_output_tokens=3,
+                total_tokens=115,
+            ),
         )
 
 
@@ -72,15 +78,19 @@ class PlannerAgentStateTest(unittest.TestCase):
             _build_fallback_private_plan([])
         )
 
-        parsed, elapsed_ms = executor._call_codex_with_retries(
+        result = executor._call_codex_with_retries(
             context_id=context_id,
             messages=[{"role": "tool", "name": "open_close_sunshade"}],
             tools=[],
             ctx_logger=_NoopLogger(),
         )
 
-        self.assertEqual(parsed, {"action": "respond", "content": "Done."})
-        self.assertEqual(elapsed_ms, 12.0)
+        self.assertEqual(
+            result.next_action,
+            {"action": "respond", "content": "Done."},
+        )
+        self.assertEqual(result.elapsed_ms, 12.0)
+        self.assertEqual(result.token_usage.input_tokens, 100)
         self.assertEqual(len(fake_client.calls), 1)
         self.assertNotIn(context_id, executor._active_private_plans_by_context)
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Clone the external CAR-bench repository required by the green evaluator.
+# Clone the external CAR-bench repository required by the evaluator.
 
 set -e
 
@@ -27,4 +27,4 @@ echo "📝 Note: Tasks and mock data are automatically loaded from HuggingFace"
 echo ""
 echo "🚀 Next steps:"
 echo "   1. Install dependencies: uv sync --extra car-bench-agent --extra car-bench-evaluator"
-echo "   2. Run the scenario: uv run agentbeats-run scenarios/purple_car_bench_agent/local.toml --show-logs"
+echo "   2. Run the scenario: uv run car-bench-run scenarios/agent_under_test/local.toml --show-logs"

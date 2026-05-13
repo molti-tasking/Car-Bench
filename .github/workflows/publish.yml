@@ -15,17 +15,17 @@ jobs:
     strategy:
       matrix:
         include:
-          # CAR-bench agents
-          - name: car-bench-agent
-            dockerfile: src/purple_car_bench_agent/Dockerfile.car-bench-agent
-          - name: car-bench-agent-codex
-            dockerfile: src/purple_car_bench_agent_codex/Dockerfile.car-bench-agent-codex
-          - name: car-bench-agent-codex-planner
-            dockerfile: src/purple_car_bench_agent_codex_planner/Dockerfile.car-bench-agent-codex-planner
-          - name: car-bench-agent-codex-python
-            dockerfile: src/purple_car_bench_agent_codex_python/Dockerfile.car-bench-agent-codex-python
+          # CAR-bench evaluator and reference agents under test
+          - name: car-bench-agent-under-test
+            dockerfile: src/agent_under_test/Dockerfile.agent-under-test
+          - name: car-bench-agent-under-test-codex
+            dockerfile: src/agent_under_test_codex/Dockerfile.agent-under-test-codex
+          - name: car-bench-agent-under-test-codex-planner
+            dockerfile: src/agent_under_test_codex_planner/Dockerfile.agent-under-test-codex-planner
+          - name: car-bench-agent-under-test-codex-python
+            dockerfile: src/agent_under_test_codex_python/Dockerfile.agent-under-test-codex-python
           - name: car-bench-evaluator
-            dockerfile: src/green_car_bench_agent/Dockerfile.car-bench-evaluator
+            dockerfile: src/evaluator/Dockerfile.evaluator
 
     # These permissions are required for the workflow to:
     # - Read repository contents (checkout code)
@@ -58,7 +58,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}-${{ matrix.name }}
+          images: ghcr.io/car-bench/${{ matrix.name }}
           tags: |
             # For tags like v1.0, create tag '1.0'
             type=semver,pattern={{version}}

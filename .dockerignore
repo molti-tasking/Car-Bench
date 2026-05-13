@@ -5,7 +5,7 @@
 **/__pycache__
 **/*.pyc
 
-# Include the green evaluator's local CAR-bench dependency, but exclude nested
+# Include the evaluator's local CAR-bench dependency, but exclude nested
 # git metadata and generated artifacts.
 third_party/car-bench/.git
 third_party/car-bench/results

@@ -1,13 +1,13 @@
 """Turn metrics schema for CAR-bench A2A evaluation.
 
-Defines constants and helpers for per-turn metrics communicated
-between purple (agent) and green (evaluator) via Message.metadata.
+Defines constants and helpers for per-turn metrics communicated from the agent
+under test to the evaluator via Message.metadata.
 """
 
-# Metadata key for turn metrics on purple→green final responses
+# Metadata key for turn metrics on agent-under-test-to-evaluator final responses
 TURN_METRICS_KEY = "turn_metrics"
 
-# Source tags for green→purple messages
+# Source tags for evaluator-to-agent-under-test messages
 SOURCE_KEY = "source"
 SOURCE_USER = "user"
 SOURCE_ENVIRONMENT = "environment"

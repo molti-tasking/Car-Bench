@@ -1,4 +1,4 @@
-"""Centralized logging configuration for agentbeats and related components."""
+"""Centralized logging configuration for CAR-bench A2A components."""
 import os
 import sys
 import json

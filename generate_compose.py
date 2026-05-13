@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Generate Docker Compose configuration from scenario.toml"""
+"""Generate Docker Compose configuration from a CAR-bench scenario TOML."""
 
 import argparse
-import os
 import re
 import sys
 from pathlib import Path
@@ -21,34 +20,6 @@ try:
 except ImportError:
     print("Error: tomli-w required. Install with: pip install tomli-w")
     sys.exit(1)
-try:
-    import requests
-except ImportError:
-    print("Error: requests required. Install with: pip install requests")
-    sys.exit(1)
-
-
-AGENTBEATS_API_URL = "https://agentbeats.dev/api/agents"
-
-
-def fetch_agent_info(agentbeats_id: str) -> dict:
-    """Fetch agent info from agentbeats.dev API."""
-    url = f"{AGENTBEATS_API_URL}/{agentbeats_id}"
-    try:
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.HTTPError as e:
-        print(f"Error: Failed to fetch agent {agentbeats_id}: {e}")
-        sys.exit(1)
-    except requests.exceptions.JSONDecodeError:
-        print(f"Error: Invalid JSON response for agent {agentbeats_id}")
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print(f"Error: Request failed for agent {agentbeats_id}: {e}")
-        sys.exit(1)
-
-
 COMPOSE_PATH = "docker-compose.yml"
 A2A_SCENARIO_PATH = "a2a-scenario.toml"
 ENV_PATH = ".env"
@@ -59,29 +30,43 @@ DEFAULT_ENV_VARS = {"PYTHONUNBUFFERED": "1"}
 COMPOSE_TEMPLATE = """# Auto-generated from scenario.toml
 
 services:
-  green-agent:{green_build_or_image}
+  evaluator:{evaluator_build_or_image}
     platform: linux/amd64
-    command: {green_command}
-    environment:{green_env}{green_volumes}
+    command: {evaluator_command}
+    environment:{evaluator_env}{evaluator_volumes}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:{green_port}/.well-known/agent-card.json"]
+      test: ["CMD", "curl", "-f", "http://localhost:{port}/.well-known/agent-card.json"]
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 30s
-    depends_on:{green_depends}
+    depends_on:
+      agent-under-test:
+        condition: service_healthy
     networks:
       - agent-network
 
-{participant_services}
+  agent-under-test:{agent_under_test_build_or_image}
+    platform: linux/amd64
+    command: {agent_under_test_command}
+    environment:{agent_under_test_env}{agent_under_test_volumes}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:{port}/.well-known/agent-card.json"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - agent-network
+
   a2a-client:
     build:
       context: .
-      dockerfile: src/agentbeats/Dockerfile.agentbeats-client
+      dockerfile: src/agentbeats/Dockerfile.a2a-client
     platform: linux/amd64
     volumes:
-      - ./a2a-scenario.toml:/home/agentbeats/app/scenario.toml
-      - ./output:/home/agentbeats/app/output
+      - ./a2a-scenario.toml:/home/carbench/app/scenario.toml
+      - ./output:/home/carbench/app/output
     command: ["scenario.toml", "output/results.json"]
     depends_on:{client_depends}
     networks:
@@ -92,56 +77,33 @@ networks:
     driver: bridge
 """
 
-PARTICIPANT_TEMPLATE = """  {name}:{build_or_image}
-    platform: linux/amd64
-    command: {command}
-    environment:{env}{volumes}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:{port}/.well-known/agent-card.json"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 30s
-    networks:
-      - agent-network
-"""
+A2A_SCENARIO_TEMPLATE = """[evaluator]
+endpoint = "http://evaluator:{port}"
 
-A2A_SCENARIO_TEMPLATE = """[green_agent]
-endpoint = "http://green-agent:{green_port}"
+[agent_under_test]
+endpoint = "http://agent-under-test:{port}"
 
-{participants}
 {config}"""
 
 
-def resolve_image(agent: dict, name: str) -> None:
-    """Resolve docker image for an agent, either from 'image', 'build', or agentbeats API."""
+def resolve_image(agent: dict[str, Any], name: str) -> None:
+    """Validate docker image/build config for a service."""
     has_image = "image" in agent
     has_build = "build" in agent
-    has_id = "agentbeats_id" in agent
 
-    if sum([has_image, has_build, has_id]) > 1:
-        print(f"Error: {name} has multiple deployment methods - use only one of 'image', 'build', or 'agentbeats_id'")
+    if has_image and has_build:
+        print(f"Error: {name} has multiple deployment methods; use only one of 'image' or 'build'.")
         sys.exit(1)
     elif has_image:
-        if os.environ.get("GITHUB_ACTIONS"):
-            print(f"Error: {name} requires 'agentbeats_id' for GitHub Actions (use 'image' or 'build' for local testing only)")
-            sys.exit(1)
         print(f"Using {name} image: {agent['image']}")
     elif has_build:
-        if os.environ.get("GITHUB_ACTIONS"):
-            print(f"Error: {name} requires 'agentbeats_id' for GitHub Actions (use 'image' or 'build' for local testing only)")
-            sys.exit(1)
         build_info = agent['build']
         if isinstance(build_info, dict):
             print(f"Using {name} build: {build_info.get('dockerfile', 'Dockerfile')} in {build_info.get('context', '.')}")
         else:
             print(f"Using {name} build: {build_info}")
-    elif has_id:
-        info = fetch_agent_info(agent["agentbeats_id"])
-        agent["image"] = info["docker_image"]
-        print(f"Resolved {name} image: {agent['image']}")
     else:
-        print(f"Error: {name} must have either 'image', 'build', or 'agentbeats_id' field")
+        print(f"Error: {name} must have either 'image' or 'build' field")
         sys.exit(1)
 
 
@@ -149,27 +111,25 @@ def parse_scenario(scenario_path: Path) -> dict[str, Any]:
     toml_data = scenario_path.read_text()
     data = tomli.loads(toml_data)
 
-    green = data.get("green_agent", {})
-    resolve_image(green, "green_agent")
-
-    participants = data.get("participants", [])
-
-    # Check for duplicate participant names
-    names = [p.get("name") for p in participants]
-    duplicates = [name for name in set(names) if names.count(name) > 1]
-    if duplicates:
-        print(f"Error: Duplicate participant names found: {', '.join(duplicates)}")
-        print("Each participant must have a unique name.")
+    if "green_agent" in data or "participants" in data:
+        print("Error: old scenario shape is unsupported; use [evaluator] and [agent_under_test].")
+        sys.exit(1)
+    evaluator = data.get("evaluator")
+    if not isinstance(evaluator, dict):
+        print("Error: scenario requires an [evaluator] table.")
+        sys.exit(1)
+    agent_under_test = data.get("agent_under_test")
+    if not isinstance(agent_under_test, dict):
+        print("Error: scenario requires an [agent_under_test] table.")
         sys.exit(1)
 
-    for participant in participants:
-        name = participant.get("name", "unknown")
-        resolve_image(participant, f"participant '{name}'")
+    resolve_image(evaluator, "evaluator")
+    resolve_image(agent_under_test, "agent_under_test")
 
     return data
 
 
-def format_build_or_image(agent: dict) -> str:
+def format_build_or_image(agent: dict[str, Any]) -> str:
     """Format either build or image field for docker-compose."""
     if "build" in agent:
         build_config = agent["build"]
@@ -188,7 +148,7 @@ def format_build_or_image(agent: dict) -> str:
         raise ValueError("Agent must have either 'image' or 'build' field")
 
 
-def format_command(base_args: list[str], command_args: list[str] = None) -> str:
+def format_command(base_args: list[str], command_args: list[str] | None = None) -> str:
     """Format command with optional additional arguments."""
     all_args = base_args + (command_args or [])
     return '[' + ', '.join(f'"{arg}"' for arg in all_args) + ']'
@@ -209,7 +169,7 @@ def format_volumes(volumes: list[str] | None) -> str:
     return "\n".join(lines)
 
 
-def format_depends_on(services: list) -> str:
+def format_depends_on(services: list[str]) -> str:
     lines = []
     for service in services:
         lines.append(f"      {service}:")
@@ -218,90 +178,53 @@ def format_depends_on(services: list) -> str:
 
 
 def generate_docker_compose(scenario: dict[str, Any]) -> str:
-    green = scenario["green_agent"]
-    participants = scenario.get("participants", [])
-
-    participant_names = [p["name"] for p in participants]
-
-    # Format green agent command
-    green_base_cmd = ["--host", "0.0.0.0", "--port", str(DEFAULT_PORT), "--card-url", f"http://green-agent:{DEFAULT_PORT}"]
-    green_command = format_command(green_base_cmd, green.get("command_args"))
-
-    participant_services = "\n".join([
-        PARTICIPANT_TEMPLATE.format(
-            name=p["name"],
-            build_or_image=format_build_or_image(p),
-            port=DEFAULT_PORT,
-            command=format_command(
-                ["--host", "0.0.0.0", "--port", str(DEFAULT_PORT), "--card-url", f"http://{p['name']}:{DEFAULT_PORT}"],
-                p.get("command_args")
-            ),
-            env=format_env_vars(p.get("env", {})),
-            volumes=format_volumes(p.get("volumes")),
-        )
-        for p in participants
-    ])
-
-    all_services = ["green-agent"] + participant_names
+    evaluator = scenario["evaluator"]
+    agent_under_test = scenario["agent_under_test"]
 
     return COMPOSE_TEMPLATE.format(
-        green_build_or_image=format_build_or_image(green),
-        green_port=DEFAULT_PORT,
-        green_command=green_command,
-        green_env=format_env_vars(green.get("env", {})),
-        green_volumes=format_volumes(green.get("volumes")),
-        green_depends=format_depends_on(participant_names),
-        participant_services=participant_services,
-        client_depends=format_depends_on(all_services)
+        evaluator_build_or_image=format_build_or_image(evaluator),
+        agent_under_test_build_or_image=format_build_or_image(agent_under_test),
+        port=DEFAULT_PORT,
+        evaluator_command=format_command(
+            ["--host", "0.0.0.0", "--port", str(DEFAULT_PORT), "--card-url", f"http://evaluator:{DEFAULT_PORT}"],
+            evaluator.get("command_args"),
+        ),
+        agent_under_test_command=format_command(
+            ["--host", "0.0.0.0", "--port", str(DEFAULT_PORT), "--card-url", f"http://agent-under-test:{DEFAULT_PORT}"],
+            agent_under_test.get("command_args"),
+        ),
+        evaluator_env=format_env_vars(evaluator.get("env", {})),
+        agent_under_test_env=format_env_vars(agent_under_test.get("env", {})),
+        evaluator_volumes=format_volumes(evaluator.get("volumes")),
+        agent_under_test_volumes=format_volumes(agent_under_test.get("volumes")),
+        client_depends=format_depends_on(["evaluator", "agent-under-test"])
     )
 
 
 def generate_a2a_scenario(scenario: dict[str, Any]) -> str:
-    green = scenario["green_agent"]
-    participants = scenario.get("participants", [])
-
-    participant_lines = []
-    for p in participants:
-        lines = [
-            f"[[participants]]",
-            f"role = \"{p['name']}\"",
-            f"endpoint = \"http://{p['name']}:{DEFAULT_PORT}\"",
-        ]
-        if "agentbeats_id" in p:
-            lines.append(f"agentbeats_id = \"{p['agentbeats_id']}\"")
-        participant_lines.append("\n".join(lines) + "\n")
-
     config_section = scenario.get("config", {})
     config_lines = [tomli_w.dumps({"config": config_section})]
 
     return A2A_SCENARIO_TEMPLATE.format(
-        green_port=DEFAULT_PORT,
-        participants="\n".join(participant_lines),
+        port=DEFAULT_PORT,
         config="\n".join(config_lines)
     )
 
 
 def generate_env_file(scenario: dict[str, Any]) -> str:
-    green = scenario["green_agent"]
-    participants = scenario.get("participants", [])
+    evaluator = scenario["evaluator"]
+    agent_under_test = scenario["agent_under_test"]
 
     secrets = set()
 
     # Extract secrets from ${VAR} patterns in env values
     env_var_pattern = re.compile(r'\$\{([A-Za-z_][A-Za-z0-9_]*)[^}]*\}')
 
-    for value in green.get("env", {}).values():
-        for match in env_var_pattern.findall(str(value)):
-            secrets.add(match)
-    for value in green.get("volumes", []):
-        for match in env_var_pattern.findall(str(value)):
-            secrets.add(match)
-
-    for p in participants:
-        for value in p.get("env", {}).values():
+    for service in (evaluator, agent_under_test):
+        for value in service.get("env", {}).values():
             for match in env_var_pattern.findall(str(value)):
                 secrets.add(match)
-        for value in p.get("volumes", []):
+        for value in service.get("volumes", []):
             for match in env_var_pattern.findall(str(value)):
                 secrets.add(match)
 

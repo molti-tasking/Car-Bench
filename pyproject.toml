@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agentbeats-tutorial"
+name = "car-bench-ijcai"
 version = "0.1.0"
-description = "Agentbeats Tutorial"
+description = "CAR-bench A2A evaluation harness"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -32,7 +32,7 @@ car-bench-evaluator = [
 ]
 
 [project.scripts]
-agentbeats-run = "agentbeats.run_scenario:main"
+car-bench-run = "agentbeats.run_scenario:main"
 
 [dependency-groups]
 dev = [

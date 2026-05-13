@@ -2,5 +2,5 @@ from typing import Any
 from pydantic import BaseModel, HttpUrl
 
 class EvalRequest(BaseModel):
-    participants: dict[str, HttpUrl] # role-endpoint mapping
+    agent_under_test: HttpUrl
     config: dict[str, Any]

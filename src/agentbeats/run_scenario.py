@@ -22,15 +22,13 @@ async def wait_for_agents(cfg: dict, timeout: int = 30, evaluate_only: bool = Fa
     """Wait for all agents to be healthy and responding."""
     endpoints = []
 
-    # When in evaluate-only mode, only check the green agent (host)
-    # Participants are checked by the green agent itself via Docker network
+    # When in evaluate-only mode, only check the evaluator (host)
+    # The agent under test is checked by the evaluator itself via Docker network.
     if evaluate_only:
-        endpoints.append(f"http://{cfg['green_agent']['host']}:{cfg['green_agent']['port']}")
+        endpoints.append(f"http://{cfg['evaluator']['host']}:{cfg['evaluator']['port']}")
     else:
-        # In normal mode, check all agents
-        for p in cfg["participants"]:
-            endpoints.append(f"http://{p['host']}:{p['port']}")
-        endpoints.append(f"http://{cfg['green_agent']['host']}:{cfg['green_agent']['port']}")
+        endpoints.append(f"http://{cfg['agent_under_test']['host']}:{cfg['agent_under_test']['port']}")
+        endpoints.append(f"http://{cfg['evaluator']['host']}:{cfg['evaluator']['port']}")
 
     if not endpoints:
         return True  # No agents to wait for
@@ -89,25 +87,19 @@ def parse_toml(scenario_path: str) -> dict:
         host, port = s.split(":", 1)
         return host, int(port)
 
-    green_ep = data.get("green_agent", {}).get("endpoint", "")
-    g_host, g_port = host_port(green_ep)
-    green_cmd = data.get("green_agent", {}).get("cmd", "")
+    if "green_agent" in data or "participants" in data:
+        logger.error("Old scenario shape is unsupported; use [evaluator] and [agent_under_test].")
+        sys.exit(1)
 
-    parts = []
-    for p in data.get("participants", []):
-        if isinstance(p, dict) and "endpoint" in p:
-            h, pt = host_port(p["endpoint"])
-            parts.append({
-                "role": str(p.get("role", "")),
-                "host": h,
-                "port": pt,
-                "cmd": p.get("cmd", "")
-            })
+    evaluator = data.get("evaluator", {})
+    agent_under_test = data.get("agent_under_test", {})
+    evaluator_host, evaluator_port = host_port(evaluator.get("endpoint", ""))
+    aut_host, aut_port = host_port(agent_under_test.get("endpoint", ""))
 
     cfg = data.get("config", {})
     return {
-        "green_agent": {"host": g_host, "port": g_port, "cmd": green_cmd},
-        "participants": parts,
+        "evaluator": {"host": evaluator_host, "port": evaluator_port, "cmd": evaluator.get("cmd", "")},
+        "agent_under_test": {"host": aut_host, "port": aut_port, "cmd": agent_under_test.get("cmd", "")},
         "config": cfg,
     }
 
@@ -141,36 +133,35 @@ def main():
 
     procs = []
     try:
-        # start participant agents (skip if --evaluate-only)
+        # Start the agent under test (skip if --evaluate-only).
         if not args.evaluate_only:
-            for p in cfg["participants"]:
-                cmd_args = shlex.split(p.get("cmd", ""))
-                if cmd_args:
-                    logger.info(
-                        "Starting participant agent",
-                        role=p['role'],
-                        host=p['host'],
-                        port=p['port']
-                    )
-                    procs.append(subprocess.Popen(
-                        cmd_args,
-                        env=base_env,
-                        stdout=sink, stderr=sink,
-                        text=True,
-                        start_new_session=True,
-                    ))
-
-        # start host (skip if --evaluate-only)
-        if not args.evaluate_only:
-            green_cmd_args = shlex.split(cfg["green_agent"].get("cmd", ""))
-            if green_cmd_args:
+            aut = cfg["agent_under_test"]
+            cmd_args = shlex.split(aut.get("cmd", ""))
+            if cmd_args:
                 logger.info(
-                    "Starting green agent",
-                    host=cfg['green_agent']['host'],
-                    port=cfg['green_agent']['port']
+                    "Starting agent under test",
+                    host=aut['host'],
+                    port=aut['port']
                 )
                 procs.append(subprocess.Popen(
-                    green_cmd_args,
+                    cmd_args,
+                    env=base_env,
+                    stdout=sink, stderr=sink,
+                    text=True,
+                    start_new_session=True,
+                ))
+
+        # Start the evaluator (skip if --evaluate-only).
+        if not args.evaluate_only:
+            evaluator_cmd_args = shlex.split(cfg["evaluator"].get("cmd", ""))
+            if evaluator_cmd_args:
+                logger.info(
+                    "Starting evaluator",
+                    host=cfg['evaluator']['host'],
+                    port=cfg['evaluator']['port']
+                )
+                procs.append(subprocess.Popen(
+                    evaluator_cmd_args,
                     env=base_env,
                     stdout=sink, stderr=sink,
                     text=True,

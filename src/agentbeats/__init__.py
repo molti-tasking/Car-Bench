@@ -1,1 +1,1 @@
-"""Agentbeats Tutorial Framework"""
+"""Internal A2A runner helpers inherited from the original template."""

@@ -40,7 +40,7 @@ http-server = [
 ]
 
 [[package]]
-name = "agentbeats-tutorial"
+name = "car-bench-ijcai"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

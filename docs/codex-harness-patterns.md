@@ -1,6 +1,6 @@
 # Codex Model And Harness Patterns
 
-The Codex purple agent is intentionally a small next-action adapter. It is a
+The Codex agent under test is intentionally a small next-action adapter. It is a
 good starting point for participants, but it does not require every participant
 to use the exact same internal inference strategy.
 
@@ -8,9 +8,9 @@ to use the exact same internal inference strategy.
 
 | Agent | Package | Local Scenario | Internal Strategy |
 |-------|---------|----------------|-------------------|
-| Codex JSON agent | [`src/purple_car_bench_agent_codex/`](../src/purple_car_bench_agent_codex/) | [`scenarios/purple_car_bench_agent_codex/smoke.toml`](../scenarios/purple_car_bench_agent_codex/smoke.toml) | Spark returns schema-constrained next-action JSON. |
-| Codex planner/executor | [`src/purple_car_bench_agent_codex_planner/`](../src/purple_car_bench_agent_codex_planner/) | [`scenarios/purple_car_bench_agent_codex_planner/smoke.toml`](../scenarios/purple_car_bench_agent_codex_planner/smoke.toml) | Larger planner runs once after a user message; Spark executor reuses the private plan across tool-result turns. |
-| Codex Python-call DSL | [`src/purple_car_bench_agent_codex_python/`](../src/purple_car_bench_agent_codex_python/) | [`scenarios/purple_car_bench_agent_codex_python/smoke.toml`](../scenarios/purple_car_bench_agent_codex_python/smoke.toml) | Spark emits a fenced Python-call action block that is parsed, never executed. |
+| Codex JSON agent | [`src/agent_under_test_codex/`](../src/agent_under_test_codex/) | [`scenarios/agent_under_test_codex/smoke.toml`](../scenarios/agent_under_test_codex/smoke.toml) | Spark returns schema-constrained next-action JSON. |
+| Codex planner/executor | [`src/agent_under_test_codex_planner/`](../src/agent_under_test_codex_planner/) | [`scenarios/agent_under_test_codex_planner/smoke.toml`](../scenarios/agent_under_test_codex_planner/smoke.toml) | Larger planner runs once after a user message; Spark executor reuses the private plan across tool-result turns. |
+| Codex Python-call DSL | [`src/agent_under_test_codex_python/`](../src/agent_under_test_codex_python/) | [`scenarios/agent_under_test_codex_python/smoke.toml`](../scenarios/agent_under_test_codex_python/smoke.toml) | Spark emits a fenced Python-call action block that is parsed, never executed. |
 
 ## Model Selection
 
@@ -29,10 +29,10 @@ total harness still fits the time budget.
 Ways to change the model:
 
 - Local run: edit `CODEX_MODEL` in `.env`.
-- Docker local build: edit `CODEX_MODEL` in `.env`; `scenarios/purple_car_bench_agent_codex/docker-local.toml`
+- Docker local build: edit `CODEX_MODEL` in `.env`; `scenarios/agent_under_test_codex/docker-local.toml`
   forwards it into the container.
 - Scenario-specific local run: add `--model <model-id>` to the participant
-  command in `scenarios/purple_car_bench_agent_codex/smoke.toml`.
+  command in `scenarios/agent_under_test_codex/smoke.toml`.
 - Code-level advanced harness: pass `model=` to `CodexAppServerClient.generate`
   for individual internal calls.
 
@@ -49,7 +49,7 @@ The reference agent is deliberately conservative:
 - It does not opt in to the app-server experimental API surface.
 - It uses only a small stable subset: initialize, `thread/start`, `turn/start`,
   item notifications, and `turn/completed`.
-- It keeps protocol handling behind `src/purple_car_bench_agent_codex/codex_client.py`.
+- It keeps protocol handling behind `src/agent_under_test_codex/codex_client.py`.
 - Docker builds pin `@openai/codex@0.130.0` by default.
 - `CODEX_APP_SERVER_CMD` lets participants point at a specific local Codex
   binary if they need to reproduce an exact run.
@@ -72,11 +72,11 @@ This is the current implementation. Each CAR-bench assistant step becomes one
 Codex turn:
 
 ```text
-A2A input from green
+A2A input from the evaluator
   -> build transcript and task-filtered tool prompt
   -> Codex Spark next-action JSON
   -> parse JSON
-  -> return TextPart or DataPart(tool_calls) to green
+  -> return TextPart or DataPart(tool_calls) to the evaluator
 ```
 
 This is the lowest-latency and easiest-to-debug pattern. It is the best first
@@ -85,11 +85,11 @@ target before trying multi-pass harnesses.
 ## Pattern 2: Planner Plus Spark Executor
 
 Use a larger model only to write a compact plan, then let Spark produce the final
-benchmark action. The plan must be internal. Green should only receive the final
+benchmark action. The plan must be internal. The evaluator should only receive the final
 TextPart or tool-call DataPart.
 
 The reference planner runs once after a user message. If the executor returns
-tool calls, green executes them and sends tool observations back; those
+tool calls, the evaluator executes them and sends tool observations back; those
 continuation turns reuse the active private plan and call only the Spark
 executor. The planner is cleared when the executor finally returns a user-facing
 response. The loop is:
@@ -107,17 +107,17 @@ reasoning and CAR-bench exposes `planning_tool`, it can still return
 `planning_tool` as a normal benchmark-visible tool call.
 
 This repository includes a working reference implementation in
-`src/purple_car_bench_agent_codex_planner/`. It uses a private
+`src/agent_under_test_codex_planner/`. It uses a private
 `planning_tool`-shaped JSON object because CAR-bench already defines a
 `planning_tool` for multi-step reasoning. The reference implementation does not
-send that private plan to green for execution. Participants may replace this
+send that private plan to the evaluator for execution. Participants may replace this
 with their own private plan tool, planning mode, planner sub-agent, or framework
 primitive as long as it only uses benchmark-visible inputs.
 
 Run it locally with:
 
 ```bash
-uv run agentbeats-run scenarios/purple_car_bench_agent_codex_planner/smoke.toml --show-logs
+uv run car-bench-run scenarios/agent_under_test_codex_planner/smoke.toml --show-logs
 ```
 
 ```python
@@ -278,7 +278,7 @@ likely.
 
 ## Pattern 5: Python-Call DSL
 
-The Python-call reference agent in `src/purple_car_bench_agent_codex_python/`
+The Python-call reference agent in `src/agent_under_test_codex_python/`
 lets Spark answer in a more Codex-native chat style: optional brief private
 text plus exactly one fenced Python action block:
 
@@ -303,7 +303,7 @@ This is inspired by programmatic tool calling, but it is not true code
 execution. Codex is not given shell, file, network, or hidden vehicle tools.
 The generated Python is parsed with Python's built-in `ast` module, never
 executed, and then mapped back into the normal A2A text response or
-`tool_calls` DataPart that green already understands.
+`tool_calls` DataPart that the evaluator already understands.
 
 The older structured envelope is still accepted as a parser fallback:
 
@@ -317,7 +317,7 @@ code block is closer to how Codex naturally proposes small pieces of code.
 Run it locally with:
 
 ```bash
-uv run agentbeats-run scenarios/purple_car_bench_agent_codex_python/smoke.toml --show-logs
+uv run car-bench-run scenarios/agent_under_test_codex_python/smoke.toml --show-logs
 ```
 
 Accepted examples:
@@ -344,19 +344,19 @@ score hallucination behavior normally.
 The code block should choose either `respond(...)` or tool calls. If a model
 emits a valid tool call and then a premature `respond("Done")` in the same
 block, the reference parser keeps the tool call and ignores the response. This
-matches the CAR-bench loop: green executes the tool, sends the observation back,
+matches the CAR-bench loop: the evaluator executes the tool, sends the observation back,
 and the agent can produce the user-facing confirmation on the following turn.
 
 ## Non-Negotiable Boundary
 
 All patterns must still return exactly one benchmark-compatible A2A response to
-green for each assistant step. Internal planners, executors, ensembles,
+the evaluator for each assistant step. Internal planners, executors, ensembles,
 condensers, and Python-call parsers must not execute vehicle tools, inspect
 hidden CAR-bench state, add private tools, browse the network, or perform
 file/shell side effects during benchmark inference.
 
 If a participant chooses to return CAR-bench's real `planning_tool` as an A2A
-tool call, green will execute and record it like any other benchmark tool call.
+tool call, the evaluator will execute and record it like any other benchmark tool call.
 That can be valid, but it is no longer private planning. The provided
 planner/executor agent keeps planning private and only returns the executor's
 final user response or environment tool calls.
