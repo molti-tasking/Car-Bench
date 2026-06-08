@@ -188,9 +188,11 @@ class CARBenchAgentExecutor(AgentExecutor):
 
             completion_kwargs = {
                 "model": self.model,
-                "tools": tools if tools else None,
-                "temperature": self.temperature,
+                "tools": tools if tools else None
             }
+
+            if self.temperature is not None:
+                completion_kwargs["temperature"] = self.temperature
 
             # Configure reasoning effort / thinking
             if self.thinking:
@@ -218,10 +220,10 @@ class CARBenchAgentExecutor(AgentExecutor):
                                 "type": "enabled",
                                 "budget_tokens": thinking_budget,
                             }
-                        if self.interleaved_thinking:
-                            completion_kwargs["extra_headers"] = {
-                                    "anthropic-beta": "interleaved-thinking-2025-05-14"
-                                }
+                    if self.interleaved_thinking:
+                        completion_kwargs["extra_headers"] = {
+                                "anthropic-beta": "interleaved-thinking-2025-05-14"
+                            }
 
 
             call_start_time = time.perf_counter()
