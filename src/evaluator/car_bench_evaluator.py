@@ -44,10 +44,7 @@ from turn_metrics import (
     extract_turn_metrics, AVG_LLM_CALL_TIME_MS, NUM_LLM_CALLS, COST,
     QUOTA_WAIT_TIME_MS, PROMPT_TOKENS, COMPLETION_TOKENS, THINKING_TOKENS,
 )
-try:
-    from car_bench_paths import CAR_BENCH_REPO
-except ModuleNotFoundError:
-    from .car_bench_paths import CAR_BENCH_REPO
+from car_bench_paths import CAR_BENCH_REPO
 sys.path.pop(0)
 
 # Import run.py from car-bench repo root
@@ -91,19 +88,6 @@ def _sum_quota_wait_seconds(results_by_split: Dict[str, List[EnvRunResult]]) -> 
                 if not isinstance(metrics, dict):
                     continue
                 total_ms += _safe_float(metrics.get(QUOTA_WAIT_TIME_MS, 0.0))
-    return total_ms / 1000.0
-
-
-def _sum_successful_llm_time_seconds(
-    results_by_split: Dict[str, List[EnvRunResult]],
-) -> float:
-    total_ms = 0.0
-    for results in results_by_split.values():
-        for result in results:
-            info = getattr(result, "info", {}) or {}
-            total_ms += _safe_float(
-                info.get("total_llm_induced_latency_ms", 0.0)
-            )
     return total_ms / 1000.0
 
 
@@ -488,7 +472,6 @@ def calculate_evaluation_results(
     total_reward = sum(r.reward for r in all_results)
     num_completed = len(all_results)
     pass_rate = (total_reward / num_completed * 100) if num_completed > 0 else 0
-    successful_llm_time_used = _sum_successful_llm_time_seconds(results_by_split)
 
     # Split task rewards by task type
     task_rewards_by_split = {
@@ -581,7 +564,6 @@ def calculate_evaluation_results(
         "time_used": time_used,
         "raw_time_used": raw_time_used if raw_time_used is not None else time_used,
         "quota_wait_time": quota_wait_time,
-        "successful_llm_time_used": successful_llm_time_used,
         "pass_power_k_scores": pass_power_k_scores,
         "pass_at_k_scores": pass_at_k_scores,
         "pass_power_k_scores_by_split": pass_power_k_scores_by_split,
@@ -595,7 +577,6 @@ def calculate_evaluation_results(
 Tasks: {num_completed}
 Overall Pass Rate: {pass_rate:.1f}% ({total_reward:.1f}/{num_completed})
 Time: {time_used:.1f}s
-Successful LLM Time: {successful_llm_time_used:.1f}s
 
 Pass Scores:
 {pass_scores_display}
