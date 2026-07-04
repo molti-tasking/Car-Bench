@@ -46,6 +46,52 @@ PROMPT_VARIANTS: dict[str, dict[str, str]] = {
             "- Antworte dem Nutzer immer auf Englisch."
         ),
     },
+    # v2 (round 2): decision procedure targeting round-1 judge-confirmed
+    # failure classes — over-disambiguation after confirmation, preference
+    # blindness, and capability fabrication. Parent: english_basic.
+    "v2_protocol": {
+        "prefix": "",
+        "suffix": (
+            "\n\nOperating procedure — apply on every turn, in this order:\n"
+            "1. Capability check: if the request needs a function or data that"
+            " your tools do not provide, say so plainly and never simulate,"
+            " promise, or invent it.\n"
+            "2. Resolve ambiguity yourself first: check vehicle state, stored"
+            " user preferences, notes, and conversation history before asking."
+            " Ask the user only if the ambiguity genuinely cannot be resolved"
+            " from available data and acting would risk doing the wrong thing.\n"
+            "3. Act on confirmation: once the user has confirmed an action,"
+            " execute it immediately with the appropriate tool. Do not re-ask"
+            " about minor parameters; use sensible defaults for anything"
+            " non-critical the user left unspecified.\n"
+            "4. Follow the policies above exactly; they win over user"
+            " convenience. Keep spoken responses brief."
+        ),
+    },
+    # Identical content to v2_protocol, XML-structured — isolates the effect
+    # of prompt markup (structure ablation). Parent: v2_protocol.
+    "v2_protocol_xml": {
+        "prefix": "",
+        "suffix": (
+            "\n\n<operating_procedure applies=\"every turn, in this order\">\n"
+            "<capability_check>If the request needs a function or data that"
+            " your tools do not provide, say so plainly and never simulate,"
+            " promise, or invent it.</capability_check>\n"
+            "<resolve_ambiguity_yourself_first>Check vehicle state, stored"
+            " user preferences, notes, and conversation history before asking."
+            " Ask the user only if the ambiguity genuinely cannot be resolved"
+            " from available data and acting would risk doing the wrong"
+            " thing.</resolve_ambiguity_yourself_first>\n"
+            "<act_on_confirmation>Once the user has confirmed an action,"
+            " execute it immediately with the appropriate tool. Do not re-ask"
+            " about minor parameters; use sensible defaults for anything"
+            " non-critical the user left unspecified.</act_on_confirmation>\n"
+            "<policy_precedence>Follow the policies above exactly; they win"
+            " over user convenience. Keep spoken responses"
+            " brief.</policy_precedence>\n"
+            "</operating_procedure>"
+        ),
+    },
     # Explicitly ask for German internal reasoning with English output.
     "german_reasoning": {
         "prefix": "",
