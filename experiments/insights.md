@@ -64,6 +64,22 @@ cites run evidence. The leaderboard says *what* won; this file says *why*.
 - **v3_minimal (two rules) ties baseline (86.7%)** — brevity preserves the
   baseline but the two rules alone didn't beat it on this subset.
 
+## 2026-07-04 — Round 4 (Pass^3 confirmation, 3 trials × 15 tasks)
+
+- **german_protocol confirmed champion**: Pass^3 86.7%, Pass@3 100%,
+  trial-level pass rate 95.6% (`20260704-1837xx`). The round-3 clean sweep
+  softened but held: per-trial rates 93–100% vs English variants at 80–87%.
+  Per category: Base Pass^3 100%, Disambiguation 80% (one flake in one
+  trial), Hallucination 80% (one task fails consistently — next target).
+- **v3_minimal**: Pass^3 80%, Pass@3 93.3% — clearly behind.
+- **Language effect replicated across 4 independent trials** (round 3 + 3×
+  round 4): German-language instructions reliably induce the
+  preference-lookup behavior that identical English instructions do not.
+- **Ops**: one dead proxy connection wedged a 3-trial run for ~3h —
+  litellm timeouts now set on both agent (AGENT_LLM_TIMEOUT) and local
+  evaluator (EVALUATOR_LLM_TIMEOUT), commit dd1befe. Baseline's 3-trial run
+  was interrupted (user stop); its single-trial 86.7% stands as reference.
+
 ## Open questions
 
 - Does XML markup of the same protocol content change GLM's adherence?
