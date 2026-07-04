@@ -92,6 +92,73 @@ PROMPT_VARIANTS: dict[str, dict[str, str]] = {
             "</operating_procedure>"
         ),
     },
+    # v3 (round 3): grounded protocol. Fixes vs v2, judge- and trajectory-
+    # confirmed: claims must be backed by tool results (hallucination_0
+    # fabricated a sunshade action), unspecified parameters take POLICY
+    # defaults not guesses (disambiguation_0 expected 50%), ambiguity resolves
+    # via the user-preferences tools before asking (disambiguation_4 expected
+    # get_user_preferences -> set_ambient_lights). Parent: v2_protocol.
+    "v3_grounded": {
+        "prefix": "",
+        "suffix": (
+            "\n\nOperating rules, in priority order:\n"
+            "1. Ground every claim in tool results: never say an action"
+            " happened or will happen unless you called its tool in this"
+            " conversation and saw a success result. If a needed function or"
+            " piece of data is not available through your tools, say so"
+            " plainly instead of improvising.\n"
+            "2. Resolve ambiguity yourself before asking: when a request"
+            " leaves something open (a color, amount, destination, setting),"
+            " first check the user's stored preferences via the available"
+            " preference/lookup tools and the defaults defined in the policies"
+            " above. Ask the user only if neither resolves it.\n"
+            "3. Unspecified parameters take the policy-defined default. Do not"
+            " invent your own default when the policies specify one.\n"
+            "4. Act on confirmation: once the user confirms, execute"
+            " immediately; do not re-ask about details.\n"
+            "5. The policies above always win. Keep spoken responses brief."
+        ),
+    },
+    # Minimal two-rule version of v3 — tests whether shorter instructions
+    # preserve the gains (round-2 evidence: more prose trended worse).
+    # Parent: v3_grounded.
+    "v3_minimal": {
+        "prefix": "",
+        "suffix": (
+            "\n\nTwo hard rules: (1) Never claim an action or capability"
+            " without a successful tool call behind it — if your tools cannot"
+            " do it, say so plainly. (2) Before asking a clarifying question,"
+            " check stored user preferences via the available tools and the"
+            " policy defaults; ask only if the ambiguity survives that."
+        ),
+    },
+    # v3_grounded content in German (English user-facing output) — the
+    # processing-language research question with competitive protocol content.
+    # Parent: v3_grounded.
+    "german_protocol": {
+        "prefix": "",
+        "suffix": (
+            "\n\nArbeitsregeln, in Prioritätsreihenfolge:\n"
+            "1. Belege jede Aussage mit Werkzeugergebnissen: Behaupte niemals,"
+            " dass eine Aktion ausgeführt wurde oder wird, ohne dass du das"
+            " zugehörige Werkzeug in diesem Gespräch aufgerufen und ein"
+            " Erfolgsergebnis erhalten hast. Wenn eine Funktion oder"
+            " Information über deine Werkzeuge nicht verfügbar ist, sage das"
+            " offen, statt zu improvisieren.\n"
+            "2. Löse Mehrdeutigkeiten zuerst selbst: Wenn eine Anfrage etwas"
+            " offen lässt (Farbe, Menge, Ziel, Einstellung), prüfe zuerst die"
+            " gespeicherten Nutzerpräferenzen über die verfügbaren Werkzeuge"
+            " und die in den Richtlinien definierten Standardwerte. Frage den"
+            " Nutzer nur, wenn beides die Mehrdeutigkeit nicht auflöst.\n"
+            "3. Nicht spezifizierte Parameter erhalten den in den Richtlinien"
+            " definierten Standardwert. Erfinde keinen eigenen Standard, wenn"
+            " die Richtlinien einen vorgeben.\n"
+            "4. Handle nach Bestätigung sofort; frage nicht erneut nach"
+            " Details.\n"
+            "5. Die obigen Richtlinien haben immer Vorrang. Antworte dem"
+            " Nutzer immer auf Englisch und halte Antworten kurz."
+        ),
+    },
     # Explicitly ask for German internal reasoning with English output.
     "german_reasoning": {
         "prefix": "",
