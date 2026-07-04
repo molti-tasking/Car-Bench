@@ -114,6 +114,12 @@ def cmd_run(args: argparse.Namespace) -> None:
     if user_sim_model:
         scenario["config"]["user_model"] = user_sim_model
         scenario["config"]["user_provider"] = user_sim_model.split("/")[0]
+    # user_thinking=True makes the simulator send reasoning_effort, which
+    # custom_openai (self-hosted) backends reject. Set USER_SIM_THINKING=false
+    # when the user simulator runs on a self-hosted model.
+    user_sim_thinking = os.getenv("USER_SIM_THINKING", "")
+    if user_sim_thinking:
+        scenario["config"]["user_thinking"] = user_sim_thinking.lower() == "true"
     policy_eval_model = os.getenv("POLICY_EVAL_MODEL", "")
     if policy_eval_model:
         scenario["config"]["policy_evaluator_model"] = policy_eval_model
@@ -257,8 +263,21 @@ def cmd_analyze(args: argparse.Namespace) -> None:
     judge_model = args.judge_model or os.getenv("JUDGE_MODEL", "anthropic/claude-sonnet-5")
     print(f"[experiment] asking judge model {judge_model} to analyze {len(judged)} failures...")
     from litellm import completion
-    response = completion(model=judge_model, messages=messages, max_tokens=8000)
-    analysis = response.choices[0].message.content or "(judge returned no content)"
+    # Reasoning judges (e.g. Kimi) can spend the whole completion budget on
+    # internal reasoning, returning empty content — give headroom and retry
+    # once with a bigger budget before falling back to the reasoning text.
+    analysis = None
+    for max_tokens in (32000, 64000):
+        response = completion(model=judge_model, messages=messages, max_tokens=max_tokens)
+        msg = response.choices[0].message
+        analysis = msg.content
+        if analysis:
+            break
+        finish = response.choices[0].finish_reason
+        print(f"[experiment] judge returned empty content (finish_reason={finish}); retrying with max_tokens={max_tokens*2}")
+    if not analysis:
+        reasoning = getattr(msg, "reasoning_content", None)
+        analysis = f"(judge returned no final content; raw reasoning follows)\n\n{reasoning}" if reasoning else "(judge returned no content)"
 
     note = f"\n> Note: {dropped} additional failures were not judged (cap {MAX_JUDGED_FAILURES}).\n" if dropped else ""
     report_path.write_text(header + note + "\n" + analysis + "\n")

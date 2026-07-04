@@ -37,7 +37,25 @@ sys.path.pop(0)
 
 logger = configure_logger(role="evaluator", context="server")
 normalize_litellm_proxy_env()  # lets user_model = "litellm_proxy/<name>" resolve
-setup_tracing(logger)
+if setup_tracing(logger):
+    # Tag evaluator-side traces (user simulator, policy judge) with the run id
+    # so they join with agent traces in Langfuse. car_bench modules bind
+    # `completion` at import time, so patch their module attributes directly.
+    import litellm
+
+    def _traced_completion(*args, **kwargs):
+        metadata = kwargs.setdefault("metadata", {})
+        metadata.setdefault("trace_name", "car-bench-evaluator")
+        tags = metadata.setdefault("tags", [])
+        tags.append("side:evaluator")
+        if os.getenv("RUN_ID"):
+            tags.append(f"run:{os.getenv('RUN_ID')}")
+        return litellm.completion(*args, **kwargs)
+
+    import car_bench.envs.user.user as _cb_user
+    import car_bench.envs.policy_evaluator as _cb_policy
+    _cb_user.completion = _traced_completion
+    _cb_policy.completion = _traced_completion
 
 
 def car_bench_evaluator_agent_card(name: str, url: str) -> AgentCard:
