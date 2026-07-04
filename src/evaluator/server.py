@@ -37,6 +37,11 @@ sys.path.pop(0)
 
 logger = configure_logger(role="evaluator", context="server")
 normalize_litellm_proxy_env()  # lets user_model = "litellm_proxy/<name>" resolve
+# DEV-ONLY: a hung LLM connection (user simulator / policy judge) must time
+# out instead of wedging the whole sequential benchmark run indefinitely.
+import litellm as _litellm
+_litellm.request_timeout = float(os.getenv("EVALUATOR_LLM_TIMEOUT", "300"))
+
 if setup_tracing(logger):
     # Tag evaluator-side traces (user simulator, policy judge) with the run id
     # so they join with agent traces in Langfuse. car_bench modules bind

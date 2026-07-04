@@ -10,6 +10,7 @@ A cleaned-up version of the Track 1 starter:
    evaluator executes all CAR-bench tools.
 """
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -170,6 +171,8 @@ class MyAgentExecutor(AgentExecutor):
             completion_kwargs = {
                 "model": self.model,
                 "tools": tools if tools else None,
+                # A hung provider connection must fail the turn, not the run.
+                "timeout": float(os.getenv("AGENT_LLM_TIMEOUT", "300")),
             }
             if self.temperature is not None:
                 completion_kwargs["temperature"] = self.temperature
