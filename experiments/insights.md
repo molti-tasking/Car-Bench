@@ -27,6 +27,43 @@ cites run evidence. The leaderboard says *what* won; this file says *why*.
   schema) — "clarify more" is the *wrong* fix for this category; "look it up
   first" is the right one.
 
+## 2026-07-04 — Round 2 (GLM user-sim, baseline vs v2 protocol pair)
+
+- **Simulator choice dominated round-1 numbers**: baseline 60% → 86.7% after
+  switching user-sim kimi→GLM (`20260704-120859`). Any cross-round comparison
+  must hold the simulator fixed.
+- **XML vs prose markup: zero difference for GLM** — v2_protocol and
+  v2_protocol_xml scored identically (80%) and failed the *same tasks the
+  same way* (`-121407` vs `-121925`). Structure ablation answered; don't
+  spend more runs on markup.
+- **"Sensible defaults" instruction backfired twice**: agent fabricated a
+  parallel sunshade action without a tool call (hallucination_0 → real
+  HALLUCINATION_ERROR), and defaulted the sunroof to 100% where the policy
+  default is 50% (disambiguation_0 expected `open_close_sunroof(50)`).
+  Defaults must be routed to policy text, and claims to tool results.
+- **"Check stored preferences" is too abstract** — the benchmark has a
+  `get_user_preferences` tool; the instruction must name the mechanism
+  (disambiguation_4 expects `get_user_preferences` → `set_ambient_lights`
+  with the stored PURPLE).
+- **GLM user-sim still misfires occasionally** (stochastic first-turn
+  `###STOP###` in `-121407` hallucination_0 that the conversation recovered
+  from, but the failure flag sticks). Small-sample category scores carry
+  simulator noise; confirm anything important with trials=3.
+
+## 2026-07-04 — Round 3 (v3 refinements + German protocol)
+
+- **german_protocol: 100% (15/15), first clean sweep** — including both
+  stubborn disambiguation tasks. Trajectory-verified: the agent proactively
+  calls `get_user_preferences`, applies the stored 50% sunroof default and
+  the PURPLE evening preference, and answers the user in English throughout.
+- **The same protocol in English (v3_grounded) scored 80%** — it did NOT
+  reliably trigger the preference lookup. The language of the *instructions*
+  changed tool-use behavior with identical semantics. Single-trial evidence;
+  Pass^3 confirmation running (Round 4). If it holds, this is the paper's
+  headline: instruction-language sensitivity of tool-using behavior in GLM.
+- **v3_minimal (two rules) ties baseline (86.7%)** — brevity preserves the
+  baseline but the two rules alone didn't beat it on this subset.
+
 ## Open questions
 
 - Does XML markup of the same protocol content change GLM's adherence?
