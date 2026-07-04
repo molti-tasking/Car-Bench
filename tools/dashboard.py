@@ -58,14 +58,21 @@ def git_subjects() -> dict[str, str]:
 
 
 def variant_slots(runs: list[dict]) -> dict[str, int]:
-    order: dict[str, int] = {}
+    """Colored slots for the most recently active variants; others fold to
+    gray ('retired') rather than cycling hues — 8 slots is the hard cap."""
+    last_seen: dict[str, int] = {}
+    for i, r in enumerate(runs):
+        last_seen[r["variant"]] = i
+    active = sorted(last_seen, key=lambda v: -last_seen[v])[:len(SLOTS_LIGHT)]
+    first: dict[str, int] = {}
     for r in runs:
-        if r["variant"] not in order:
-            order[r["variant"]] = len(order) % len(SLOTS_LIGHT)
-    for v in PROMPT_VARIANTS:  # future variants keep stable slots too
-        if v not in order:
-            order[v] = len(order) % len(SLOTS_LIGHT)
-    return order
+        first.setdefault(r["variant"], len(first))
+    return {v: i for i, v in enumerate(sorted(active, key=lambda v: first[v]))}
+
+
+def slot_cls(slots: dict[str, int], variant: str, prefix: str = "s") -> str:
+    n = slots.get(variant)
+    return f"{prefix}{n}" if n is not None else f"{prefix}ret"
 
 
 def max_passk(d: dict | None) -> float | None:
@@ -117,9 +124,9 @@ def bars_by_category(rows: list[dict], slots: dict[str, int]) -> str:
             bh = plot_h * v
             x = x0 + bi * (bar_w + 2)
             y = PAD_T + plot_h - bh
-            c = slots[r["variant"]]
+            c = slot_cls(slots, r["variant"])
             parts.append(
-                f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{max(bh,1.5):.1f}" rx="3" class="s{c}">'
+                f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{max(bh,1.5):.1f}" rx="3" class="{c}">'
                 f'<title>{esc(r["variant"])} — {glabel}: {v*100:.0f}% (run {esc(r["run_id"])})</title></rect>'
             )
             parts.append(f'<text x="{x+bar_w/2:.1f}" y="{y-5:.1f}" class="val" text-anchor="middle">{v*100:.0f}</text>')
@@ -164,13 +171,13 @@ def trajectory(runs: list[dict], slots: dict[str, int]) -> str:
     for i, r in enumerate(seq):
         by_variant.setdefault(r["variant"], []).append((i, r))
     for v, pts in by_variant.items():
-        c = slots[v]
+        c = slot_cls(slots, v)
         if len(pts) > 1:
             d = " ".join(f'{"M" if j==0 else "L"}{xs(i):.1f},{ys(r["pass_rate"] or 0):.1f}' for j, (i, r) in enumerate(pts))
-            parts.append(f'<path d="{d}" class="line s{c}" fill="none"/>')
+            parts.append(f'<path d="{d}" class="line {c}" fill="none"/>')
         for i, r in pts:
             parts.append(
-                f'<circle cx="{xs(i):.1f}" cy="{ys(r["pass_rate"] or 0):.1f}" r="5" class="dot s{c}">'
+                f'<circle cx="{xs(i):.1f}" cy="{ys(r["pass_rate"] or 0):.1f}" r="5" class="dot {c}">'
                 f'<title>{esc(v)} — {r["pass_rate"]:.0f}% | {esc(r["run_id"])} | {r["tasks_per_category"]} tasks/cat × {r["num_trials"]} trials</title></circle>'
             )
         i_last, r_last = pts[-1]
@@ -189,6 +196,11 @@ def build() -> str:
     slots = variant_slots(runs)
     comparable = latest_comparable(runs)
     best = max(comparable, key=lambda r: r.get("pass_rate") or 0) if comparable else None
+    import os
+    from dotenv import load_dotenv
+    load_dotenv(REPO_ROOT / ".env")
+    user_sim = (os.getenv("USER_SIM_MODEL") or "gemini-2.5-flash").split("/")[-1]
+    judge = (os.getenv("JUDGE_MODEL") or "?").split("/")[-1]
     total_tokens = sum(r.get("total_tokens") or 0 for r in runs)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
@@ -196,12 +208,12 @@ def build() -> str:
     slot_css_dark = "\n".join(f".s{i}{{fill:{c}}} path.s{i}{{stroke:{c}}} .sw{i}{{background:{c}}}" for i, c in enumerate(SLOTS_DARK))
 
     legend = "".join(
-        f'<span class="lg"><i class="sw sw{slots[v]}"></i>{esc(v)}</span>'
+        f'<span class="lg"><i class="sw {slot_cls(slots, v, 'sw')}"></i>{esc(v)}</span>'
         for v in dict.fromkeys([r["variant"] for r in comparable])
     )
 
     table_rows = "".join(
-        f'<tr><td class="mono">{esc(r["run_id"])}</td><td><i class="sw sw{slots[r["variant"]]}"></i> {esc(r["variant"])}</td>'
+        f'<tr><td class="mono">{esc(r["run_id"])}</td><td><i class="sw {slot_cls(slots, r["variant"], 'sw')}"></i> {esc(r["variant"])}</td>'
         f'<td class="mono">{esc(r["model"].split("/")[-1])}</td><td>{esc(r["split"])}</td>'
         f'<td class="num">{r["tasks_per_category"]}</td><td class="num">{r["num_trials"]}</td>'
         f'<td class="num">{(r["pass_rate"] or 0):.1f}%</td>'
@@ -212,7 +224,7 @@ def build() -> str:
     )
 
     variant_cards = "".join(
-        f'<div class="vcard"><div class="vhead"><i class="sw sw{slots[v]}"></i><b>{esc(v)}</b></div>'
+        f'<div class="vcard"><div class="vhead"><i class="sw {slot_cls(slots, v, 'sw')}"></i><b>{esc(v)}</b></div>'
         f'<pre class="prompt">{esc((spec["prefix"] + spec["suffix"]).strip() or "(evaluator prompt unchanged)")}</pre></div>'
         for v, spec in PROMPT_VARIANTS.items()
     )
@@ -360,7 +372,7 @@ pre.report {{ max-height:420px; }}
 <header>
   <div class="eyebrow">CAR-bench · IJCAI-ECAI 2026 · Track 1</div>
   <h1>Agent Improvement Console</h1>
-  <div class="sub">GLM-5.2 agent under test · self-hosted stack (Kimi-K2.5 user-sim &amp; judges) · generated {now}</div>
+  <div class="sub">{esc((runs[-1]["model"].split("/")[-1]) if runs else "—")} agent under test · user-sim {esc(user_sim)} · judges {esc(judge)} · generated {now}</div>
 </header>
 
 <div class="tiles">{tiles}</div>
