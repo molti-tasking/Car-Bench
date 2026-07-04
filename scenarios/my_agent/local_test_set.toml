@@ -1,0 +1,23 @@
+# Local full public test-set scenario for my_agent, three trials.
+# Use this to compare prompt variants: set AGENT_PROMPT_VARIANT in .env
+# (or inline: AGENT_PROMPT_VARIANT=german_basic uv run car-bench-run ...)
+# and compare Pass^3 / Pass@3 across runs in output/.
+#
+# Tip: to screen variants cheaply first, copy this file and set the three
+# task-count fields to e.g. 10/10/10 instead of -1 (-1 = all tasks).
+
+[evaluator]
+endpoint = "http://127.0.0.1:8081"
+cmd = "python src/evaluator/server.py --host 127.0.0.1 --port 8081"
+
+[agent_under_test]
+endpoint = "http://127.0.0.1:8080"
+cmd = "python src/my_agent/server.py --host 127.0.0.1 --port 8080"
+
+[config]
+num_trials = 3
+task_split = "test"
+tasks_base_num_tasks = -1
+tasks_hallucination_num_tasks = -1
+tasks_disambiguation_num_tasks = -1
+max_steps = 50

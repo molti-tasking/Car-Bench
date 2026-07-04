@@ -1,0 +1,19 @@
+# Local smoke scenario for my_agent.
+# Runs one train task from each CAR-bench task type, one trial.
+# Model and prompt variant come from .env (AGENT_LLM, AGENT_PROMPT_VARIANT).
+
+[evaluator]
+endpoint = "http://127.0.0.1:8081"
+cmd = "python src/evaluator/server.py --host 127.0.0.1 --port 8081"
+
+[agent_under_test]
+endpoint = "http://127.0.0.1:8080"
+cmd = "python src/my_agent/server.py --host 127.0.0.1 --port 8080"
+
+[config]
+num_trials = 1
+task_split = "train"
+tasks_base_num_tasks = 1
+tasks_hallucination_num_tasks = 1
+tasks_disambiguation_num_tasks = 1
+max_steps = 50
