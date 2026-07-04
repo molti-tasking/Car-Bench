@@ -29,9 +29,15 @@ from car_bench_evaluator import CARBenchEvaluator
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from logging_utils import configure_logger
+# DEV-ONLY tracing: env-gated Langfuse callback for the locally-run evaluator
+# (simulated-user and policy-judge LLM calls). The official evaluator image
+# used for Docker/GHCR/submission runs does not contain this hook.
+from my_agent.observability import normalize_litellm_proxy_env, setup_tracing
 sys.path.pop(0)
 
 logger = configure_logger(role="evaluator", context="server")
+normalize_litellm_proxy_env()  # lets user_model = "litellm_proxy/<name>" resolve
+setup_tracing(logger)
 
 
 def car_bench_evaluator_agent_card(name: str, url: str) -> AgentCard:

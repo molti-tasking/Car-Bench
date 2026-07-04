@@ -38,6 +38,7 @@ car-bench-run = "agentbeats.run_scenario:main"
 dev = [
     "mypy>=1.18.1",
     "tomli-w>=1.0.0",
+    "langfuse>=2.60.0,<3",
 ]
 
 [tool.uv]
