@@ -105,6 +105,7 @@ def resolve_config() -> dict:
         "reasoning_effort": reasoning_effort,
         "self_check": os.getenv("AGENT_SELF_CHECK", "false").lower() == "true",
         "self_check_model": os.getenv("AGENT_SELF_CHECK_MODEL") or None,
+        "ask_gate": os.getenv("AGENT_ASK_GATE", "false").lower() == "true",
         # For litellm_proxy/* models the proxy credentials come from the
         # normalized LITELLM_PROXY_* env vars; explicit AGENT_API_KEY/BASE
         # still override. Direct provider models (anthropic/..., gemini/...)
@@ -150,6 +151,7 @@ def main():
             system_prompt_suffix=config["system_prompt_suffix"],
             self_check=config["self_check"],
             self_check_model=config["self_check_model"],
+            ask_gate=config["ask_gate"],
         ),
         task_store=InMemoryTaskStore(),
         agent_card=card,

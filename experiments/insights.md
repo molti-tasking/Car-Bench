@@ -98,6 +98,19 @@ cites run evidence. The leaderboard says *what* won; this file says *why*.
   sleep/wake; detached `nohup` processes survive. Long runs must be
   launched detached with a disposable registry watcher.
 
+## 2026-07-05 — Round 6 (v5 prompt refinement)
+
+- **v5_german+selfcheck: Pass^3 73.3% — ties the champion but loses the
+  tiebreak** (Pass@3 86.7 vs 91.1, pass rate 80.0 vs 82.2,
+  `20260705-152847`). Category see-saw again: state-verification rules fixed
+  Base (87→93) but stricter no-invented-constraints dropped Disambiguation
+  (60→53). **Prompt-text iteration has plateaued at 73.3%** across two
+  refinement rounds; every rule buys one category with another.
+- Champion remains **v4_german+selfcheck**. Round 7 shifts fully to harness
+  logic: ask-gate (one internal regeneration nudge when the agent is about
+  to ask a clarifying question without having called get_user_preferences)
+  targeting the Disambiguation Pass^3 ceiling.
+
 ## Open questions
 
 - Does XML markup of the same protocol content change GLM's adherence?

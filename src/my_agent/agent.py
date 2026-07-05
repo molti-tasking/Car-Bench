@@ -44,6 +44,14 @@ class SelfCheckVerdict(BaseModel):
     revised_response: str | None = None
 
 
+ASK_GATE_NUDGE = (
+    "Interner Hinweis: Du wolltest gerade eine Rückfrage stellen. Prüfe zuerst"
+    " mit get_user_preferences (mit passenden Kategorien) und den in den"
+    " Richtlinien definierten Standardwerten, ob sich die Frage erübrigt."
+    " Nur wenn beides die Mehrdeutigkeit nicht auflöst, stelle die Rückfrage."
+)
+
+
 SELF_CHECK_PROMPT = """Du prüfst den Antwortentwurf eines Auto-Sprachassistenten \
 vor dem Absenden. Melde NUR diese zwei Fehler:
 1. Der Entwurf behauptet, eine Aktion oder Zustandsänderung sei erfolgt oder \
@@ -72,9 +80,11 @@ class MyAgentExecutor(AgentExecutor):
         system_prompt_suffix: str = "",
         self_check: bool = False,
         self_check_model: str | None = None,
+        ask_gate: bool = False,
     ):
         self.self_check = self_check
         self.self_check_model = self_check_model
+        self.ask_gate = ask_gate
         self.model = model
         self.temperature = temperature
         self.reasoning_effort = reasoning_effort
@@ -289,6 +299,35 @@ class MyAgentExecutor(AgentExecutor):
             llm_message = response.choices[0].message
             assistant_content = llm_message.model_dump(exclude_unset=True)
             tool_calls = assistant_content.get("tool_calls")
+
+            # Optional ask-gate: about to ask a clarifying question without
+            # ever having consulted stored preferences? One internal nudge to
+            # look up first, then the regenerated decision stands.
+            if (
+                self.ask_gate
+                and not tool_calls
+                and "?" in (assistant_content.get("content") or "")
+                and any(t.get("function", {}).get("name") == "get_user_preferences" for t in (tools or []))
+                and not any(
+                    tc["function"]["name"] == "get_user_preferences"
+                    for m in messages if m.get("role") == "assistant"
+                    for tc in (m.get("tool_calls") or [])
+                )
+            ):
+                try:
+                    ctx_logger.info("Ask-gate: regenerating with preference-lookup nudge")
+                    nudged = messages + [{"role": "system", "content": ASK_GATE_NUDGE}]
+                    response = completion(messages=nudged, **completion_kwargs)
+                    usage = getattr(response, "usage", None)
+                    if usage:
+                        turn_m[PROMPT_TOKENS] += getattr(usage, "prompt_tokens", 0) or 0
+                        turn_m[COMPLETION_TOKENS] += getattr(usage, "completion_tokens", 0) or 0
+                    turn_m[NUM_LLM_CALLS] += 1
+                    llm_message = response.choices[0].message
+                    assistant_content = llm_message.model_dump(exclude_unset=True)
+                    tool_calls = assistant_content.get("tool_calls")
+                except Exception as gate_err:
+                    ctx_logger.warning(f"Ask-gate failed, keeping draft: {gate_err}")
 
             # Optional pre-send self-check on user-facing replies (no tool
             # calls this turn): catches claimed-but-unexecuted actions.
