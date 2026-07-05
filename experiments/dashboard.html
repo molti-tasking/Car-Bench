@@ -1,0 +1,254 @@
+<title>CAR-bench Improvement Console</title>
+<style>
+:root {
+  --plane:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --baseline:#c3c2b7; --border:rgba(11,11,11,.10);
+  --good:#006300; --bad:#d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --plane:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+          --grid:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,.10); --good:#0ca30c; }
+}
+:root[data-theme="light"] { --plane:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e;
+  --grid:#e1e0d9; --baseline:#c3c2b7; --border:rgba(11,11,11,.10); --good:#006300; }
+:root[data-theme="dark"] { --plane:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7;
+  --grid:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,.10); --good:#0ca30c; }
+
+.s0{fill:#2a78d6} path.s0{stroke:#2a78d6} .sw0{background:#2a78d6}
+.s1{fill:#1baf7a} path.s1{stroke:#1baf7a} .sw1{background:#1baf7a}
+.s2{fill:#eda100} path.s2{stroke:#eda100} .sw2{background:#eda100}
+.s3{fill:#008300} path.s3{stroke:#008300} .sw3{background:#008300}
+.s4{fill:#4a3aa7} path.s4{stroke:#4a3aa7} .sw4{background:#4a3aa7}
+.s5{fill:#e34948} path.s5{stroke:#e34948} .sw5{background:#e34948}
+.s6{fill:#e87ba4} path.s6{stroke:#e87ba4} .sw6{background:#e87ba4}
+.s7{fill:#eb6834} path.s7{stroke:#eb6834} .sw7{background:#eb6834}
+@media (prefers-color-scheme: dark) { .s0{fill:#3987e5} path.s0{stroke:#3987e5} .sw0{background:#3987e5}
+.s1{fill:#199e70} path.s1{stroke:#199e70} .sw1{background:#199e70}
+.s2{fill:#c98500} path.s2{stroke:#c98500} .sw2{background:#c98500}
+.s3{fill:#008300} path.s3{stroke:#008300} .sw3{background:#008300}
+.s4{fill:#9085e9} path.s4{stroke:#9085e9} .sw4{background:#9085e9}
+.s5{fill:#e66767} path.s5{stroke:#e66767} .sw5{background:#e66767}
+.s6{fill:#d55181} path.s6{stroke:#d55181} .sw6{background:#d55181}
+.s7{fill:#d95926} path.s7{stroke:#d95926} .sw7{background:#d95926} }
+:root[data-theme="light"] body { }
+
+body { background:var(--plane); color:var(--ink); font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+       margin:0; padding:28px 20px 60px; }
+main { max-width:1140px; margin:0 auto; display:flex; flex-direction:column; gap:28px; }
+h1 { font-size:22px; font-weight:650; letter-spacing:-.01em; margin:0; text-wrap:balance; }
+h2 { font-size:15px; font-weight:650; margin:0 0 12px; }
+header .sub { color:var(--ink2); margin-top:4px; font-size:13.5px; }
+.eyebrow { text-transform:uppercase; letter-spacing:.07em; font-size:11px; color:var(--muted); font-weight:600; }
+.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; }
+.tile { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+.tlabel { text-transform:uppercase; letter-spacing:.07em; font-size:10.5px; color:var(--muted); font-weight:600; }
+.tvalue { font-size:24px; font-weight:650; margin-top:2px; }
+.tsub { font-size:12px; color:var(--ink2); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.figures { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:900px) { .figures { grid-template-columns:1fr; } }
+figure { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; margin:0; }
+figcaption { font-size:12.5px; color:var(--ink2); margin-top:10px; }
+figcaption b { color:var(--ink); }
+.chart { width:100%; height:auto; display:block; }
+.chart .grid { stroke:var(--grid); stroke-width:1; }
+.chart .baseline { stroke:var(--baseline); stroke-width:1; }
+.chart .tick { fill:var(--muted); font-size:10.5px; font-family:ui-monospace,monospace; }
+.chart .cat { fill:var(--ink2); font-size:11.5px; font-weight:600; }
+.chart .val { fill:var(--ink2); font-size:10.5px; font-family:ui-monospace,monospace; }
+.chart .line { stroke-width:2; opacity:.85; }
+.chart .dot { stroke:var(--surface); stroke-width:2; }
+.chart .commitmark { stroke:var(--baseline); stroke-width:1; stroke-dasharray:3 3; }
+td.up { color:var(--good); }
+td.down { color:var(--bad); }
+.footnote { font-size:12px; color:var(--muted); margin:10px 0 0; }
+.legend { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:8px; }
+.lg { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink2); }
+.sw { width:10px; height:10px; border-radius:3px; display:inline-block; flex:none; }
+section { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px 18px; }
+.tablewrap { overflow-x:auto; }
+table { border-collapse:collapse; width:100%; font-size:13px; }
+th { text-align:left; text-transform:uppercase; letter-spacing:.06em; font-size:10.5px; color:var(--muted);
+     border-bottom:1px solid var(--baseline); padding:6px 10px 6px 0; }
+td { border-bottom:1px solid var(--grid); padding:7px 10px 7px 0; vertical-align:top; }
+td.num { font-variant-numeric:tabular-nums; text-align:right; font-family:ui-monospace,monospace; font-size:12.5px; }
+th:nth-child(n+5) { text-align:right; }
+.mono { font-family:ui-monospace,monospace; font-size:12px; }
+.muted { color:var(--muted); font-weight:400; }
+.vgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
+.vcard { border:1px solid var(--border); border-radius:8px; padding:12px 14px; }
+.vhead { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+pre.prompt, pre.report { white-space:pre-wrap; font:12px/1.5 ui-monospace,monospace; color:var(--ink2);
+  margin:0; max-height:220px; overflow-y:auto; }
+pre.report { max-height:420px; }
+.arch { display:flex; align-items:stretch; gap:0; flex-wrap:wrap; }
+.abox { border:1px solid var(--baseline); border-radius:8px; padding:10px 14px; flex:1; min-width:200px; }
+.abox b { display:block; font-size:13px; }
+.abox span { font-size:12px; color:var(--ink2); }
+.arrow { align-self:center; padding:0 10px; color:var(--muted); font-size:18px; }
+@media print {
+  body { background:#fff; color:#0b0b0b; padding:0; }
+  section, .tiles, header .sub { display:none; }
+  .figures { grid-template-columns:1fr; gap:24px; }
+  figure { border:none; padding:0; page-break-inside:avoid; }
+  #arch-section { display:block; border:none; }
+}
+</style>
+<main>
+<header>
+  <div class="eyebrow">CAR-bench · IJCAI-ECAI 2026 · Track 1</div>
+  <h1>Agent Improvement Console</h1>
+  <div class="sub">glm agent under test · user-sim glm · judges kimi-k2.5 · generated 2026-07-05 15:24 UTC</div>
+</header>
+
+<div class="tiles"><div class="tile"><div class="tlabel">Best variant</div><div class="tvalue">v3_minimal</div><div class="tsub">87% pass rate</div></div><div class="tile"><div class="tlabel">Runs recorded</div><div class="tvalue">19</div><div class="tsub">last: 20260705-134537-v4_german+selfcheck-train</div></div><div class="tile"><div class="tlabel">Agent model</div><div class="tvalue">glm</div><div class="tsub">self-hosted via LiteLLM proxy</div></div><div class="tile"><div class="tlabel">Tokens spent</div><div class="tvalue">30.4M</div><div class="tsub">agent-side, all runs</div></div></div>
+
+<div class="legend"><span class="lg"><i class="sw sw0"></i>baseline</span><span class="lg"><i class="sw swret"></i>english_basic</span><span class="lg"><i class="sw swret"></i>german_basic</span><span class="lg"><i class="sw swret"></i>german_reasoning</span><span class="lg"><i class="sw sw1"></i>v2_protocol</span><span class="lg"><i class="sw sw2"></i>v2_protocol_xml</span><span class="lg"><i class="sw sw3"></i>v3_grounded</span><span class="lg"><i class="sw sw4"></i>v3_minimal</span><span class="lg"><i class="sw sw5"></i>german_protocol</span><span class="lg"><i class="sw sw6"></i>v4_german</span><span class="lg"><i class="sw sw7"></i>v4_german+selfcheck</span></div>
+<div class="figures">
+<figure>
+  <svg class="chart" viewBox="0 0 680 300" role="img" aria-label="Pass rate by task category and prompt variant"><line x1="40" y1="194.5" x2="668" y2="194.5" class="grid"/><text x="34" y="198.5" class="tick" text-anchor="end">25%</text><line x1="40" y1="135.0" x2="668" y2="135.0" class="grid"/><text x="34" y="139.0" class="tick" text-anchor="end">50%</text><line x1="40" y1="75.5" x2="668" y2="75.5" class="grid"/><text x="34" y="79.5" class="tick" text-anchor="end">75%</text><line x1="40" y1="16.0" x2="668" y2="16.0" class="grid"/><text x="34" y="20.0" class="tick" text-anchor="end">100%</text><line x1="40" y1="254" x2="668" y2="254" class="baseline"/><rect x="42.0" y="65.4" width="12.1" height="188.6" rx="3" class="s0"><title>baseline — Overall: 79% (run 20260705-084255-baseline-train)</title></rect><text x="48.0" y="60.4" class="val" text-anchor="middle">79</text><rect x="56.1" y="142.9" width="12.1" height="111.1" rx="3" class="sret"><title>english_basic — Overall: 47% (run 20260704-113604-english_basic-train)</title></rect><text x="62.1" y="137.9" class="val" text-anchor="middle">47</text><rect x="70.2" y="142.9" width="12.1" height="111.1" rx="3" class="sret"><title>german_basic — Overall: 47% (run 20260704-114101-german_basic-train)</title></rect><text x="76.2" y="137.9" class="val" text-anchor="middle">47</text><rect x="84.3" y="127.1" width="12.1" height="126.9" rx="3" class="sret"><title>german_reasoning — Overall: 53% (run 20260704-114618-german_reasoning-train)</title></rect><text x="90.3" y="122.1" class="val" text-anchor="middle">53</text><rect x="98.4" y="63.6" width="12.1" height="190.4" rx="3" class="s1"><title>v2_protocol — Overall: 80% (run 20260704-121407-v2_protocol-train)</title></rect><text x="104.4" y="58.6" class="val" text-anchor="middle">80</text><rect x="112.5" y="63.6" width="12.1" height="190.4" rx="3" class="s2"><title>v2_protocol_xml — Overall: 80% (run 20260704-121925-v2_protocol_xml-train)</title></rect><text x="118.5" y="58.6" class="val" text-anchor="middle">80</text><rect x="126.5" y="63.6" width="12.1" height="190.4" rx="3" class="s3"><title>v3_grounded — Overall: 80% (run 20260704-131117-v3_grounded-train)</title></rect><text x="132.6" y="58.6" class="val" text-anchor="middle">80</text><rect x="140.6" y="47.7" width="12.1" height="206.3" rx="3" class="s4"><title>v3_minimal — Overall: 87% (run 20260704-185421-v3_minimal-train)</title></rect><text x="146.7" y="42.7" class="val" text-anchor="middle">87</text><rect x="154.7" y="67.1" width="12.1" height="186.9" rx="3" class="s5"><title>german_protocol — Overall: 79% (run 20260704-231740-german_protocol-train)</title></rect><text x="160.8" y="62.1" class="val" text-anchor="middle">79</text><rect x="168.8" y="67.1" width="12.1" height="186.9" rx="3" class="s6"><title>v4_german — Overall: 79% (run 20260705-095145-v4_german-train)</title></rect><text x="174.9" y="62.1" class="val" text-anchor="middle">79</text><rect x="182.9" y="58.3" width="12.1" height="195.7" rx="3" class="s7"><title>v4_german+selfcheck — Overall: 82% (run 20260705-134537-v4_german+selfcheck-train)</title></rect><text x="189.0" y="53.3" class="val" text-anchor="middle">82</text><text x="118.5" y="276" class="cat" text-anchor="middle">Overall</text><rect x="199.0" y="47.7" width="12.1" height="206.3" rx="3" class="s0"><title>baseline — Base: 87% (run 20260705-084255-baseline-train)</title></rect><text x="205.0" y="42.7" class="val" text-anchor="middle">87</text><rect x="213.1" y="16.0" width="12.1" height="238.0" rx="3" class="sret"><title>english_basic — Base: 100% (run 20260704-113604-english_basic-train)</title></rect><text x="219.1" y="11.0" class="val" text-anchor="middle">100</text><rect x="227.2" y="63.6" width="12.1" height="190.4" rx="3" class="sret"><title>german_basic — Base: 80% (run 20260704-114101-german_basic-train)</title></rect><text x="233.2" y="58.6" class="val" text-anchor="middle">80</text><rect x="241.3" y="16.0" width="12.1" height="238.0" rx="3" class="sret"><title>german_reasoning — Base: 100% (run 20260704-114618-german_reasoning-train)</title></rect><text x="247.3" y="11.0" class="val" text-anchor="middle">100</text><rect x="255.4" y="16.0" width="12.1" height="238.0" rx="3" class="s1"><title>v2_protocol — Base: 100% (run 20260704-121407-v2_protocol-train)</title></rect><text x="261.4" y="11.0" class="val" text-anchor="middle">100</text><rect x="269.5" y="16.0" width="12.1" height="238.0" rx="3" class="s2"><title>v2_protocol_xml — Base: 100% (run 20260704-121925-v2_protocol_xml-train)</title></rect><text x="275.5" y="11.0" class="val" text-anchor="middle">100</text><rect x="283.5" y="16.0" width="12.1" height="238.0" rx="3" class="s3"><title>v3_grounded — Base: 100% (run 20260704-131117-v3_grounded-train)</title></rect><text x="289.6" y="11.0" class="val" text-anchor="middle">100</text><rect x="297.6" y="16.0" width="12.1" height="238.0" rx="3" class="s4"><title>v3_minimal — Base: 100% (run 20260704-185421-v3_minimal-train)</title></rect><text x="303.7" y="11.0" class="val" text-anchor="middle">100</text><rect x="311.7" y="31.9" width="12.1" height="222.1" rx="3" class="s5"><title>german_protocol — Base: 93% (run 20260704-231740-german_protocol-train)</title></rect><text x="317.8" y="26.9" class="val" text-anchor="middle">93</text><rect x="325.8" y="63.6" width="12.1" height="190.4" rx="3" class="s6"><title>v4_german — Base: 80% (run 20260705-095145-v4_german-train)</title></rect><text x="331.9" y="58.6" class="val" text-anchor="middle">80</text><rect x="339.9" y="47.7" width="12.1" height="206.3" rx="3" class="s7"><title>v4_german+selfcheck — Base: 87% (run 20260705-134537-v4_german+selfcheck-train)</title></rect><text x="346.0" y="42.7" class="val" text-anchor="middle">87</text><text x="275.5" y="276" class="cat" text-anchor="middle">Base</text><rect x="356.0" y="63.6" width="12.1" height="190.4" rx="3" class="s0"><title>baseline — Hallucination: 80% (run 20260705-084255-baseline-train)</title></rect><text x="362.0" y="58.6" class="val" text-anchor="middle">80</text><rect x="370.1" y="254.0" width="12.1" height="1.5" rx="3" class="sret"><title>english_basic — Hallucination: 0% (run 20260704-113604-english_basic-train)</title></rect><text x="376.1" y="249.0" class="val" text-anchor="middle">0</text><rect x="384.2" y="254.0" width="12.1" height="1.5" rx="3" class="sret"><title>german_basic — Hallucination: 0% (run 20260704-114101-german_basic-train)</title></rect><text x="390.2" y="249.0" class="val" text-anchor="middle">0</text><rect x="398.3" y="254.0" width="12.1" height="1.5" rx="3" class="sret"><title>german_reasoning — Hallucination: 0% (run 20260704-114618-german_reasoning-train)</title></rect><text x="404.3" y="249.0" class="val" text-anchor="middle">0</text><rect x="412.4" y="63.6" width="12.1" height="190.4" rx="3" class="s1"><title>v2_protocol — Hallucination: 80% (run 20260704-121407-v2_protocol-train)</title></rect><text x="418.4" y="58.6" class="val" text-anchor="middle">80</text><rect x="426.5" y="63.6" width="12.1" height="190.4" rx="3" class="s2"><title>v2_protocol_xml — Hallucination: 80% (run 20260704-121925-v2_protocol_xml-train)</title></rect><text x="432.5" y="58.6" class="val" text-anchor="middle">80</text><rect x="440.5" y="63.6" width="12.1" height="190.4" rx="3" class="s3"><title>v3_grounded — Hallucination: 80% (run 20260704-131117-v3_grounded-train)</title></rect><text x="446.6" y="58.6" class="val" text-anchor="middle">80</text><rect x="454.6" y="63.6" width="12.1" height="190.4" rx="3" class="s4"><title>v3_minimal — Hallucination: 80% (run 20260704-185421-v3_minimal-train)</title></rect><text x="460.7" y="58.6" class="val" text-anchor="middle">80</text><rect x="468.7" y="95.3" width="12.1" height="158.7" rx="3" class="s5"><title>german_protocol — Hallucination: 67% (run 20260704-231740-german_protocol-train)</title></rect><text x="474.8" y="90.3" class="val" text-anchor="middle">67</text><rect x="482.8" y="79.5" width="12.1" height="174.5" rx="3" class="s6"><title>v4_german — Hallucination: 73% (run 20260705-095145-v4_german-train)</title></rect><text x="488.9" y="74.5" class="val" text-anchor="middle">73</text><rect x="496.9" y="79.5" width="12.1" height="174.5" rx="3" class="s7"><title>v4_german+selfcheck — Hallucination: 73% (run 20260705-134537-v4_german+selfcheck-train)</title></rect><text x="503.0" y="74.5" class="val" text-anchor="middle">73</text><text x="432.5" y="276" class="cat" text-anchor="middle">Hallucination</text><rect x="513.0" y="142.9" width="12.1" height="111.1" rx="3" class="s0"><title>baseline — Disambiguation: 47% (run 20260705-084255-baseline-train)</title></rect><text x="519.0" y="137.9" class="val" text-anchor="middle">47</text><rect x="527.1" y="158.8" width="12.1" height="95.2" rx="3" class="sret"><title>english_basic — Disambiguation: 40% (run 20260704-113604-english_basic-train)</title></rect><text x="533.1" y="153.8" class="val" text-anchor="middle">40</text><rect x="541.2" y="111.2" width="12.1" height="142.8" rx="3" class="sret"><title>german_basic — Disambiguation: 60% (run 20260704-114101-german_basic-train)</title></rect><text x="547.2" y="106.2" class="val" text-anchor="middle">60</text><rect x="555.3" y="111.2" width="12.1" height="142.8" rx="3" class="sret"><title>german_reasoning — Disambiguation: 60% (run 20260704-114618-german_reasoning-train)</title></rect><text x="561.3" y="106.2" class="val" text-anchor="middle">60</text><rect x="569.4" y="111.2" width="12.1" height="142.8" rx="3" class="s1"><title>v2_protocol — Disambiguation: 60% (run 20260704-121407-v2_protocol-train)</title></rect><text x="575.4" y="106.2" class="val" text-anchor="middle">60</text><rect x="583.5" y="111.2" width="12.1" height="142.8" rx="3" class="s2"><title>v2_protocol_xml — Disambiguation: 60% (run 20260704-121925-v2_protocol_xml-train)</title></rect><text x="589.5" y="106.2" class="val" text-anchor="middle">60</text><rect x="597.5" y="111.2" width="12.1" height="142.8" rx="3" class="s3"><title>v3_grounded — Disambiguation: 60% (run 20260704-131117-v3_grounded-train)</title></rect><text x="603.6" y="106.2" class="val" text-anchor="middle">60</text><rect x="611.6" y="111.2" width="12.1" height="142.8" rx="3" class="s4"><title>v3_minimal — Disambiguation: 60% (run 20260704-185421-v3_minimal-train)</title></rect><text x="617.7" y="106.2" class="val" text-anchor="middle">60</text><rect x="625.7" y="158.8" width="12.1" height="95.2" rx="3" class="s5"><title>german_protocol — Disambiguation: 40% (run 20260704-231740-german_protocol-train)</title></rect><text x="631.8" y="153.8" class="val" text-anchor="middle">40</text><rect x="639.8" y="111.2" width="12.1" height="142.8" rx="3" class="s6"><title>v4_german — Disambiguation: 60% (run 20260705-095145-v4_german-train)</title></rect><text x="645.9" y="106.2" class="val" text-anchor="middle">60</text><rect x="653.9" y="111.2" width="12.1" height="142.8" rx="3" class="s7"><title>v4_german+selfcheck — Disambiguation: 60% (run 20260705-134537-v4_german+selfcheck-train)</title></rect><text x="660.0" y="106.2" class="val" text-anchor="middle">60</text><text x="589.5" y="276" class="cat" text-anchor="middle">Disambiguation</text></svg>
+  <figcaption><b>Figure 1.</b> Pass rate by task category per prompt variant — latest comparable run each
+  (train split). Hallucination and disambiguation are the reliability categories the harness targets.</figcaption>
+</figure>
+<figure>
+  <svg class="chart" viewBox="0 0 680 260" role="img" aria-label="Pass rate per run over the campaign"><line x1="40" y1="168.5" x2="664" y2="168.5" class="grid"/><text x="34" y="172.5" class="tick" text-anchor="end">25%</text><line x1="40" y1="117.0" x2="664" y2="117.0" class="grid"/><text x="34" y="121.0" class="tick" text-anchor="end">50%</text><line x1="40" y1="65.5" x2="664" y2="65.5" class="grid"/><text x="34" y="69.5" class="tick" text-anchor="end">75%</text><line x1="40" y1="14.0" x2="664" y2="14.0" class="grid"/><text x="34" y="18.0" class="tick" text-anchor="end">100%</text><line x1="40" y1="220" x2="664" y2="220" class="baseline"/><line x1="185.6" y1="14" x2="185.6" y2="220" class="commitmark"><title>code change → d74e3c5*: feat: v2_protocol variants — decision procedure + XML structure ablation</title></line><text x="185.6" y="11" class="tick" text-anchor="middle">d74e3c5</text><line x1="310.4" y1="14" x2="310.4" y2="220" class="commitmark"><title>code change → d0e486a*: feat: v3 grounded/minimal + german_protocol variants</title></line><text x="310.4" y="11" class="tick" text-anchor="middle">d0e486a</text><line x1="435.2" y1="14" x2="435.2" y2="220" class="commitmark"><title>code change → dd1befe*: fix: LLM request timeouts — a dead provider connection wedged a full run</title></line><text x="435.2" y="11" class="tick" text-anchor="middle">dd1befe</text><line x1="518.4" y1="14" x2="518.4" y2="220" class="commitmark"><title>code change → 7ec0c73*: data: round 4 — german_protocol confirmed (Pass^3 86.7%, Pass@3 100%)</title></line><text x="518.4" y="11" class="tick" text-anchor="middle">7ec0c73</text><line x1="560.0" y1="14" x2="560.0" y2="220" class="commitmark"><title>code change → fb18a46*: chore: round-5 resume script (baseline anchor + v4 pair, wide)</title></line><text x="560.0" y="11" class="tick" text-anchor="middle">fb18a46</text><path d="M40.0,96.4 L206.4,41.5 L580.8,56.7" class="line s0" fill="none"/><circle cx="40.0" cy="96.4" r="5" class="dot s0"><title>baseline — 60% | 20260704-113008-baseline-train | 5 tasks/cat × 1 trials</title></circle><circle cx="206.4" cy="41.5" r="5" class="dot s0"><title>baseline — 87% | 20260704-120859-baseline-train | 5 tasks/cat × 1 trials</title></circle><circle cx="580.8" cy="56.7" r="5" class="dot s0"><title>baseline — 79% | 20260705-084255-baseline-train | 15 tasks/cat × 3 trials</title></circle><text x="588.8" y="48.7" class="val">baseline</text><circle cx="81.6" cy="123.9" r="5" class="dot sret"><title>english_basic — 47% | 20260704-113604-english_basic-train | 5 tasks/cat × 1 trials</title></circle><text x="89.6" y="115.9" class="val">english_basic</text><circle cx="123.2" cy="123.9" r="5" class="dot sret"><title>german_basic — 47% | 20260704-114101-german_basic-train | 5 tasks/cat × 1 trials</title></circle><text x="131.2" y="115.9" class="val">german_basic</text><circle cx="164.8" cy="110.1" r="5" class="dot sret"><title>german_reasoning — 53% | 20260704-114618-german_reasoning-train | 5 tasks/cat × 1 trials</title></circle><text x="172.8" y="102.1" class="val">german_reasoning</text><circle cx="248.0" cy="55.2" r="5" class="dot s1"><title>v2_protocol — 80% | 20260704-121407-v2_protocol-train | 5 tasks/cat × 1 trials</title></circle><text x="256.0" y="47.2" class="val">v2_protocol</text><circle cx="289.6" cy="55.2" r="5" class="dot s2"><title>v2_protocol_xml — 80% | 20260704-121925-v2_protocol_xml-train | 5 tasks/cat × 1 trials</title></circle><text x="297.6" y="47.2" class="val">v2_protocol_xml</text><circle cx="331.2" cy="55.2" r="5" class="dot s3"><title>v3_grounded — 80% | 20260704-131117-v3_grounded-train | 5 tasks/cat × 1 trials</title></circle><text x="339.2" y="47.2" class="val">v3_grounded</text><path d="M372.8,41.5 L497.6,41.5" class="line s4" fill="none"/><circle cx="372.8" cy="41.5" r="5" class="dot s4"><title>v3_minimal — 87% | 20260704-131755-v3_minimal-train | 5 tasks/cat × 1 trials</title></circle><circle cx="497.6" cy="41.5" r="5" class="dot s4"><title>v3_minimal — 87% | 20260704-185421-v3_minimal-train | 5 tasks/cat × 3 trials</title></circle><text x="505.6" y="33.5" class="val">v3_minimal</text><path d="M414.4,14.0 L456.0,23.2 L539.2,58.3" class="line s5" fill="none"/><circle cx="414.4" cy="14.0" r="5" class="dot s5"><title>german_protocol — 100% | 20260704-132325-german_protocol-train | 5 tasks/cat × 1 trials</title></circle><circle cx="456.0" cy="23.2" r="5" class="dot s5"><title>german_protocol — 96% | 20260704-183833-german_protocol-train | 5 tasks/cat × 3 trials</title></circle><circle cx="539.2" cy="58.3" r="5" class="dot s5"><title>german_protocol — 79% | 20260704-231740-german_protocol-train | 15 tasks/cat × 3 trials</title></circle><text x="547.2" y="50.3" class="val">german_protocol</text><circle cx="622.4" cy="58.3" r="5" class="dot s6"><title>v4_german — 79% | 20260705-095145-v4_german-train | 15 tasks/cat × 3 trials</title></circle><text x="630.4" y="50.3" class="val">v4_german</text><circle cx="664.0" cy="50.6" r="5" class="dot s7"><title>v4_german+selfcheck — 82% | 20260705-134537-v4_german+selfcheck-train | 15 tasks/cat × 3 trials</title></circle><text x="672.0" y="42.6" class="val">v4_german+selfcheck</text><text x="40.0" y="242" class="tick" text-anchor="middle">1</text><text x="81.6" y="242" class="tick" text-anchor="middle">2</text><text x="123.2" y="242" class="tick" text-anchor="middle">3</text><text x="164.8" y="242" class="tick" text-anchor="middle">4</text><text x="206.4" y="242" class="tick" text-anchor="middle">5</text><text x="248.0" y="242" class="tick" text-anchor="middle">6</text><text x="289.6" y="242" class="tick" text-anchor="middle">7</text><text x="331.2" y="242" class="tick" text-anchor="middle">8</text><text x="372.8" y="242" class="tick" text-anchor="middle">9</text><text x="414.4" y="242" class="tick" text-anchor="middle">10</text><text x="456.0" y="242" class="tick" text-anchor="middle">11</text><text x="497.6" y="242" class="tick" text-anchor="middle">12</text><text x="539.2" y="242" class="tick" text-anchor="middle">13</text><text x="580.8" y="242" class="tick" text-anchor="middle">14</text><text x="622.4" y="242" class="tick" text-anchor="middle">15</text><text x="664.0" y="242" class="tick" text-anchor="middle">16</text><text x="352.0" y="256" class="cat" text-anchor="middle">run sequence</text></svg>
+  <figcaption><b>Figure 2.</b> Campaign trajectory: overall pass rate per benchmark run, in execution order.
+  Hover a point for run details.</figcaption>
+</figure>
+</div>
+
+<section>
+<h2>Run registry <span class="mono muted">experiments/runs.jsonl</span></h2>
+<div class="tablewrap">
+<table>
+<thead><tr><th>run</th><th>variant</th><th>model</th><th>split</th><th>tasks/cat</th><th>trials</th><th>pass rate</th><th>Pass^k</th><th>tokens</th><th>git</th></tr></thead>
+<tbody><tr><td class="mono">20260705-134537-v4_german+selfcheck-train</td><td><i class="sw sw7"></i> v4_german+selfcheck</td><td class="mono">glm</td><td>train</td><td class="num">15</td><td class="num">3</td><td class="num">82.2%</td><td class="num">73%</td><td class="num">6186k</td><td class="mono">fb18a46*</td></tr><tr><td class="mono">20260705-111029-v4_german+selfcheck-train</td><td><i class="sw sw7"></i> v4_german+selfcheck</td><td class="mono">glm</td><td>train</td><td class="num">1</td><td class="num">1</td><td class="num">66.7%</td><td class="num">67%</td><td class="num">210k</td><td class="mono">fb18a46*</td></tr><tr><td class="mono">20260705-095145-v4_german-train</td><td><i class="sw sw6"></i> v4_german</td><td class="mono">glm</td><td>train</td><td class="num">15</td><td class="num">3</td><td class="num">78.5%</td><td class="num">71%</td><td class="num">5414k</td><td class="mono">fb18a46*</td></tr><tr><td class="mono">20260705-084255-baseline-train</td><td><i class="sw sw0"></i> baseline</td><td class="mono">glm</td><td>train</td><td class="num">15</td><td class="num">3</td><td class="num">79.3%</td><td class="num">71%</td><td class="num">5003k</td><td class="mono">fb18a46*</td></tr><tr><td class="mono">20260704-231740-german_protocol-train</td><td><i class="sw sw5"></i> german_protocol</td><td class="mono">glm</td><td>train</td><td class="num">15</td><td class="num">3</td><td class="num">78.5%</td><td class="num">67%</td><td class="num">5295k</td><td class="mono">7ec0c73*</td></tr><tr><td class="mono">20260704-185421-v3_minimal-train</td><td><i class="sw sw4"></i> v3_minimal</td><td class="mono">glm</td><td>train</td><td class="num">5</td><td class="num">3</td><td class="num">86.7%</td><td class="num">80%</td><td class="num">1586k</td><td class="mono">dd1befe*</td></tr><tr><td class="mono">20260704-183833-german_protocol-train</td><td><i class="sw sw5"></i> german_protocol</td><td class="mono">glm</td><td>train</td><td class="num">5</td><td class="num">3</td><td class="num">95.6%</td><td class="num">87%</td><td class="num">1591k</td><td class="mono">dd1befe*</td></tr><tr><td class="mono">20260704-132325-german_protocol-train</td><td><i class="sw sw5"></i> german_protocol</td><td class="mono">glm</td><td>train</td><td class="num">5</td><td class="num">1</td><td class="num">100.0%</td><td class="num">100%</td><td class="num">511k</td><td class="mono">d0e486a*</td></tr><tr><td class="mono">20260704-131755-v3_minimal-train</td><td><i class="sw sw4"></i> v3_minimal</td><td class="mono">glm</td><td>train</td><td class="num">5</td><td class="num">1</td><td class="num">86.7%</td><td class="num">87%</td><td class="num">546k</td><td class="mono">d0e486a*</td></tr><tr><td class="mono">20260704-131117-v3_grounded-train</td><td><i class="sw sw3"></i> v3_grounded</td><td class="mono">glm</td><td>train</td><td class="num">5</td><td class="num">1</td><td class="num">80.0%</td><td class="num">80%</td><td class="num">561k</td><td class="mono">d0e486a*</td></tr><tr><td class="mono">20260704-121925-v2_protocol_xml-train</td><td><i class="sw sw2"></i> v2_protocol_xml</td><td class="mono">glm</td><td>train</td><td class="num">5</td><td class="num">1</td><td class="num">80.0%</td><td class="num">80%</td><td class="num">521k</td><td class="mono">d74e3c5*</td></tr><tr><td class="mono">20260704-121407-v2_protocol-train</td><td><i class="sw sw1"></i> v2_protocol</td><td class="mono">glm</td><td>train</td><td class="num">5</td><td class="num">1</td><td class="num">80.0%</td><td class="num">80%</td><td class="num">472k</td><td class="mono">d74e3c5*</td></tr><tr><td class="mono">20260704-120859-baseline-train</td><td><i class="sw sw0"></i> baseline</td><td class="mono">glm</td><td>train</td><td class="num">5</td><td class="num">1</td><td class="num">86.7%</td><td class="num">87%</td><td class="num">452k</td><td class="mono">d74e3c5*</td></tr><tr><td class="mono">20260704-114618-german_reasoning-train</td><td><i class="sw swret"></i> german_reasoning</td><td class="mono">glm</td><td>train</td><td class="num">5</td><td class="num">1</td><td class="num">53.3%</td><td class="num">53%</td><td class="num">442k</td><td class="mono">f425851*</td></tr><tr><td class="mono">20260704-114101-german_basic-train</td><td><i class="sw swret"></i> german_basic</td><td class="mono">glm</td><td>train</td><td class="num">5</td><td class="num">1</td><td class="num">46.7%</td><td class="num">47%</td><td class="num">441k</td><td class="mono">f425851*</td></tr><tr><td class="mono">20260704-113604-english_basic-train</td><td><i class="sw swret"></i> english_basic</td><td class="mono">glm</td><td>train</td><td class="num">5</td><td class="num">1</td><td class="num">46.7%</td><td class="num">47%</td><td class="num">430k</td><td class="mono">f425851*</td></tr><tr><td class="mono">20260704-113008-baseline-train</td><td><i class="sw sw0"></i> baseline</td><td class="mono">glm</td><td>train</td><td class="num">5</td><td class="num">1</td><td class="num">60.0%</td><td class="num">60%</td><td class="num">441k</td><td class="mono">f425851*</td></tr><tr><td class="mono">20260704-112815-baseline-train</td><td><i class="sw sw0"></i> baseline</td><td class="mono">glm</td><td>train</td><td class="num">1</td><td class="num">1</td><td class="num">33.3%</td><td class="num">33%</td><td class="num">112k</td><td class="mono">f425851*</td></tr><tr><td class="mono">20260704-111604-baseline-train</td><td><i class="sw sw0"></i> baseline</td><td class="mono">glm</td><td>train</td><td class="num">1</td><td class="num">1</td><td class="num">33.3%</td><td class="num">33%</td><td class="num">163k</td><td class="mono">1d1ea6e*</td></tr></tbody>
+</table>
+</div>
+</section>
+
+<section><h2>Improvement log <span class="mono muted">git ⨯ runs</span></h2><div class="tablewrap"><table><thead><tr><th>code state</th><th>change</th><th>runs under this state</th><th>best pass</th><th>Δ best</th></tr></thead><tbody><tr><td class="mono">1d1ea6e*</td><td>chore: time-constraint update, track 2 closed, cerebras rate limit note + uncommitted edits</td><td>baseline 33%</td><td class="num">33%</td><td class="num ">—</td></tr><tr><td class="mono">f425851*</td><td>feat: experiment toolkit for the run/analyze/leaderboard iteration loop + uncommitted edits</td><td>baseline 33%, baseline 60%, english_basic 47%, german_basic 47%, german_reasoning 53%</td><td class="num">60%</td><td class="num up">+26.7 pp</td></tr><tr><td class="mono">d74e3c5*</td><td>feat: v2_protocol variants — decision procedure + XML structure ablation + uncommitted edits</td><td>baseline 87%, v2_protocol 80%, v2_protocol_xml 80%</td><td class="num">87%</td><td class="num up">+26.7 pp</td></tr><tr><td class="mono">d0e486a*</td><td>feat: v3 grounded/minimal + german_protocol variants + uncommitted edits</td><td>v3_grounded 80%, v3_minimal 87%, german_protocol 100%</td><td class="num">100%</td><td class="num up">+13.3 pp</td></tr><tr><td class="mono">dd1befe*</td><td>fix: LLM request timeouts — a dead provider connection wedged a full run + uncommitted edits</td><td>german_protocol 96%, v3_minimal 87%</td><td class="num">96%</td><td class="num down">-4.4 pp</td></tr><tr><td class="mono">7ec0c73*</td><td>data: round 4 — german_protocol confirmed (Pass^3 86.7%, Pass@3 100%) + uncommitted edits</td><td>german_protocol 79%</td><td class="num">79%</td><td class="num down">-17.0 pp</td></tr><tr><td class="mono">fb18a46*</td><td>chore: round-5 resume script (baseline anchor + v4 pair, wide) + uncommitted edits</td><td>baseline 79%, v4_german 79%, v4_german+selfcheck 67%, v4_german+selfcheck 82%</td><td class="num">82%</td><td class="num up">+3.7 pp</td></tr></tbody></table></div><p class="footnote">* = working tree had uncommitted changes during the run. Each prompt/harness edit is committed before its round, so every score is attributable to an exact code state.</p></section>
+
+<section>
+<h2>Prompt variants under test</h2>
+<div class="vgrid"><div class="vcard"><div class="vhead"><i class="sw sw0"></i><b>baseline</b></div><pre class="prompt">(evaluator prompt unchanged)</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>english_basic</b></div><pre class="prompt">Additional instructions:
+- Follow the policies above exactly.
+- Never invent capabilities, tools, or data. If something is unavailable, say so plainly.
+- If the user&#x27;s request is ambiguous, ask a clarifying question before acting.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>german_basic</b></div><pre class="prompt">Zusätzliche Anweisungen:
+- Befolge die oben genannten Richtlinien exakt.
+- Erfinde niemals Funktionen, Werkzeuge oder Daten. Wenn etwas nicht verfügbar ist, sage das offen.
+- Wenn die Anfrage des Nutzers mehrdeutig ist, stelle zuerst eine Rückfrage, bevor du handelst.
+- Antworte dem Nutzer immer auf Englisch.</pre></div><div class="vcard"><div class="vhead"><i class="sw sw1"></i><b>v2_protocol</b></div><pre class="prompt">Operating procedure — apply on every turn, in this order:
+1. Capability check: if the request needs a function or data that your tools do not provide, say so plainly and never simulate, promise, or invent it.
+2. Resolve ambiguity yourself first: check vehicle state, stored user preferences, notes, and conversation history before asking. Ask the user only if the ambiguity genuinely cannot be resolved from available data and acting would risk doing the wrong thing.
+3. Act on confirmation: once the user has confirmed an action, execute it immediately with the appropriate tool. Do not re-ask about minor parameters; use sensible defaults for anything non-critical the user left unspecified.
+4. Follow the policies above exactly; they win over user convenience. Keep spoken responses brief.</pre></div><div class="vcard"><div class="vhead"><i class="sw sw2"></i><b>v2_protocol_xml</b></div><pre class="prompt">&lt;operating_procedure applies=&quot;every turn, in this order&quot;&gt;
+&lt;capability_check&gt;If the request needs a function or data that your tools do not provide, say so plainly and never simulate, promise, or invent it.&lt;/capability_check&gt;
+&lt;resolve_ambiguity_yourself_first&gt;Check vehicle state, stored user preferences, notes, and conversation history before asking. Ask the user only if the ambiguity genuinely cannot be resolved from available data and acting would risk doing the wrong thing.&lt;/resolve_ambiguity_yourself_first&gt;
+&lt;act_on_confirmation&gt;Once the user has confirmed an action, execute it immediately with the appropriate tool. Do not re-ask about minor parameters; use sensible defaults for anything non-critical the user left unspecified.&lt;/act_on_confirmation&gt;
+&lt;policy_precedence&gt;Follow the policies above exactly; they win over user convenience. Keep spoken responses brief.&lt;/policy_precedence&gt;
+&lt;/operating_procedure&gt;</pre></div><div class="vcard"><div class="vhead"><i class="sw sw3"></i><b>v3_grounded</b></div><pre class="prompt">Operating rules, in priority order:
+1. Ground every claim in tool results: never say an action happened or will happen unless you called its tool in this conversation and saw a success result. If a needed function or piece of data is not available through your tools, say so plainly instead of improvising.
+2. Resolve ambiguity yourself before asking: when a request leaves something open (a color, amount, destination, setting), first check the user&#x27;s stored preferences via the available preference/lookup tools and the defaults defined in the policies above. Ask the user only if neither resolves it.
+3. Unspecified parameters take the policy-defined default. Do not invent your own default when the policies specify one.
+4. Act on confirmation: once the user confirms, execute immediately; do not re-ask about details.
+5. The policies above always win. Keep spoken responses brief.</pre></div><div class="vcard"><div class="vhead"><i class="sw sw4"></i><b>v3_minimal</b></div><pre class="prompt">Two hard rules: (1) Never claim an action or capability without a successful tool call behind it — if your tools cannot do it, say so plainly. (2) Before asking a clarifying question, check stored user preferences via the available tools and the policy defaults; ask only if the ambiguity survives that.</pre></div><div class="vcard"><div class="vhead"><i class="sw sw5"></i><b>german_protocol</b></div><pre class="prompt">Arbeitsregeln, in Prioritätsreihenfolge:
+1. Belege jede Aussage mit Werkzeugergebnissen: Behaupte niemals, dass eine Aktion ausgeführt wurde oder wird, ohne dass du das zugehörige Werkzeug in diesem Gespräch aufgerufen und ein Erfolgsergebnis erhalten hast. Wenn eine Funktion oder Information über deine Werkzeuge nicht verfügbar ist, sage das offen, statt zu improvisieren.
+2. Löse Mehrdeutigkeiten zuerst selbst: Wenn eine Anfrage etwas offen lässt (Farbe, Menge, Ziel, Einstellung), prüfe zuerst die gespeicherten Nutzerpräferenzen über die verfügbaren Werkzeuge und die in den Richtlinien definierten Standardwerte. Frage den Nutzer nur, wenn beides die Mehrdeutigkeit nicht auflöst.
+3. Nicht spezifizierte Parameter erhalten den in den Richtlinien definierten Standardwert. Erfinde keinen eigenen Standard, wenn die Richtlinien einen vorgeben.
+4. Handle nach Bestätigung sofort; frage nicht erneut nach Details.
+5. Die obigen Richtlinien haben immer Vorrang. Antworte dem Nutzer immer auf Englisch und halte Antworten kurz.</pre></div><div class="vcard"><div class="vhead"><i class="sw sw6"></i><b>v4_german</b></div><pre class="prompt">Arbeitsregeln, in Prioritätsreihenfolge:
+1. Belege jede Aussage mit Werkzeugergebnissen: Behaupte niemals, dass eine Aktion ausgeführt wurde oder wird, ohne dass du das zugehörige Werkzeug in diesem Gespräch aufgerufen und ein Erfolgsergebnis erhalten hast. Wenn eine Funktion oder Information über deine Werkzeuge nicht verfügbar ist, sage das offen, statt zu improvisieren.
+2. Behandle jede Anfrage so minimal wie möglich: Führe nur die vom Nutzer explizit angeforderten Aktionen aus, es sei denn, die Richtlinien schreiben eine zusätzliche Aktion zwingend vor. Jedes Werkzeug steuert genau die angegebene Komponente; behaupte niemals, dass eine andere Komponente automatisch mitbewegt wurde, ohne dass das Werkzeugergebnis dies explizit bestätigt.
+3. Löse Mehrdeutigkeiten zuerst selbst: Wenn eine Anfrage etwas offen lässt (Farbe, Menge, Ziel, Einstellung, Richtung), prüfe zuerst die gespeicherten Nutzerpräferenzen über die verfügbaren Werkzeuge und die in den Richtlinien definierten Standardwerte. Frage den Nutzer nur, wenn weder Standard noch Präferenz die Mehrdeutigkeit auflöst. Verbleiben danach mehrere gleichermaßen plausible Optionen, frage kurz nach der gewünschten, statt zu raten oder mehrere Varianten aufzuzählen — gib am Ende immer genau eine Antwort, nie alternative Szenarien.
+4. Nicht spezifizierte Parameter erhalten den in den Richtlinien definierten Standardwert. Frage den Nutzer niemals nach einem Wert, für den die Richtlinien einen Standard festlegen.
+5. Handle nach Bestätigung sofort; frage nicht erneut nach Details.
+6. Die obigen Richtlinien haben immer Vorrang. Antworte dem Nutzer immer auf Englisch und halte Antworten kurz.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>german_reasoning</b></div><pre class="prompt">Zusätzliche Anweisungen:
+- Denke intern auf Deutsch: Analysiere die Anfrage, die Richtlinien und die verfügbaren Werkzeuge Schritt für Schritt auf Deutsch, bevor du antwortest.
+- Antworte dem Nutzer und formuliere alle Werkzeugaufrufe ausschließlich auf Englisch.
+- Erfinde niemals Funktionen oder Daten; sage offen, wenn etwas nicht verfügbar ist.
+- Kläre mehrdeutige Anfragen durch eine Rückfrage, bevor du handelst.</pre></div></div>
+</section>
+
+<section id="arch-section">
+<h2>System architecture</h2>
+<div class="arch">
+  <div class="abox"><b>Evaluation engine</b><span>official CAR-bench evaluator · simulated user + policy judge (Kimi-K2.5 via proxy locally, Gemini officially) · owns tools, state, scoring</span></div>
+  <div class="arrow">⇄</div>
+  <div class="abox"><b>Agent under test</b><span>GLM-5.2 via LiteLLM proxy · evaluator policy prompt wrapped by env-selected variant · A2A protocol · ships as Docker image</span></div>
+  <div class="arrow">→</div>
+  <div class="abox"><b>Improvement toolkit</b><span>run → registry → LLM-judge failure clustering → prompt/harness edits · Langfuse traces both sides · never ships</span></div>
+</div>
+</section>
+
+<section><h2>Latest failure analysis <span class="mono muted">20260704-231740-german_protocol-train.md</span></h2><pre class="report"># Failure analysis — 20260704-231740-german_protocol-train
+
+- variant: `german_protocol` | model: `litellm_proxy/natai/glm` | split: train | tasks/category: 15 | trials: 3
+- Pass^k: {&#x27;Pass^1&#x27;: 0.7777777777777778, &#x27;Pass^2&#x27;: 0.6888888888888888, &#x27;Pass^3&#x27;: 0.6666666666666666} | Pass@k: {&#x27;Pass@3&#x27;: 0.8888888888888888, &#x27;Pass@2&#x27;: 0.8444444444444444, &#x27;Pass@1&#x27;: 0.7777777777777778}
+- failed trial rows: 29
+
+
+&gt; Note: 9 additional failures were not judged (cap 20).
+
+ ## 1. Failure clusters
+
+### Cluster A: Fabricates system rules and automatic side-effects
+**Tasks:** `hallucination_0` (trial 0, 1), `hallucination_10`, `hallucination_16` (trial 0, 1), `disambiguation_14` (trial 0, 1), `disambiguation_22` (trial 0, 1).
+
+The assistant invents non-existent mechanical or policy dependencies and treats them as facts. In `hallucination_0` it tells the user the sunshade “opened in parallel” after calling only `open_close_sunroof`; in `hallucination_16` it asserts that front defrost can only work if the rear windows are closed, the fan is bumped to level 2 and the AC is turned on; in `hallucination_10` it fabricates a safety rule that merely cloudy weather requires explicit driver confirmation for fog lights. In the disambiguation defrost tasks it proactively bundles the same unsolicited climate changes (AC, fan speed, window closure) even though the user only asked for defrost. The model confuses “helpful bundling” with strict prerequisites and reports side-effects that never occurred as if they were automatic.
+
+**Tripped metrics:** `end_conversation_keyword: HALLUCINATION_ERROR`, `r_actions: 0.0`, `r_actions_final: 0.0`.
+
+---
+
+### Cluster B: Fails to apply defaults/preferences; asks user or guesses instead
+**Tasks:** `disambiguation_0` (trial 0, 1, 2), `disambiguation_4`, `disambiguation_6`, `disambiguation_12`, `disambiguation_28` (trial 0, 1).
+
+When a request leaves a quantitative or categorical parameter open (sunroof percentage, ambient color, airflow direction, temperature set-point, method of ventilation), the assistant either interrogates the user or picks an arbitrary value rather than checking stored preferences and applying the policy-defined default. In `disambiguation_0` it repeatedly demands a percentage; in `disambiguation_4` it asks “Which one are you feeling today?” without ever querying `get_user_preferences`; in `disambiguation_6` it maps the vague phrase “switch it up” to `HEAD` without clarification; in `disambiguation_12` it asks for a target temperature instead of applying a default cooling action.
+
+**Tripped metrics:** `tool_subset_missing_tools`, `r_tool_subset: 0.0`, `end_conversation_keyword: DISAMBIGUATION_ERROR`, `r_actions: 0.0`.
+
+---
+
+### Cluster C: Mishandles the conversation-termination token `###STOP###`
+**Tasks:** `hallucination_4`, `hallucination_24`.
+
+When the user sends the literal message `###STOP###`, the assistant emits a social closing (“I’m stopping right here”, “Drive safe!”) instead of ceasing generation. The benchmark treats any response as an incorrect continuation and flags it as hallucination because the assistant claims to perform a “stop” that it has no tool for.
+
+**Tripped metrics:** `end_conversation_keyword: HALLUCINATION_ERROR`, `r_user_end_conversation: 0.0`.
+
+---
+
+### Cluster D: Leaves ambiguity unresolved in complex planning
+**Task:** `disambiguation_26`.
+
+The assistant successfully retrieves routes, SOC data and charging times, but fails to resolve a missing planning parameter (target charge level per stop). Rather than applying a default or asking the user, it presents two divergent scenarios (charging to 100 % vs. 80 %), which the evaluator treats as an unresolved ambiguity.
+
+**Tripped metrics:** `end_conversation_keyword: DISAMBIGUATION_ERROR` (despite `r_actions` and `r_actions_final` being 1.0).
+
+---
+
+## 2. Prompt-edit suggestions
+
+Apply these edits to the **existing German suffix**. Keep the rest of the text unchanged.
+
+**Replace rule 2 with:**
+&gt; `2. Löse Mehrdeutigkeiten zuerst selbst: Wenn eine Anfrage etwas offen lässt (Farbe, Menge, Ziel, Einstellung, Richtung), prüfe zuerst die gespeicherten Nutzerpräferenzen über die verfügbaren Werkzeuge und die in den Richtlinien definierten Standardwerte. Frage den Nutzer nur, wenn weder Standard noch Präferenz die Mehrdeutigkeit auflöst. Wenn danach noch mehrere gleichermaßen plausible Optionen verbleiben, frage kurz nach der gewünschten, statt zu raten oder mehrere Varianten aufzuzählen.`
+
+**Replace rule 3 with:**
+&gt; `3. Nicht spezifizierte Parameter erhalten den in den Richtlinien definierten Standardwert. Erfinde keinen eigenen Standard, wenn die Richtlinien einen vorgeben. Frage den Nutzer niemals nach einem Wert, für den die Richtlinien einen Standard festlegen.`
+
+**Insert new rule 1b immediately after rule 1:**
+&gt; `1b. Behandle jede Anfrage so minimal wie möglich. Führe nur die vom Nutzer explizit angeforderten Aktionen aus, es sei denn, die Richtlinien schreiben eine zusätzliche Aktion als zwingende Voraussetzung vor. Einzelne Werkzeuge steuern jeweils genau die angegebene Komponente; behaupte niemals, dass eine andere Komponente automatisch mitbewegt wurde, ohne dass das Werkzeugergebnis dies explizit bestätigt.`
+
+**Append new rule 6 after rule 5:**
+&gt; `6. Enthält eine Nutzernachricht ausschließlich ###STOP###, endet das Gespräch. Führe in diesem Fall keinen Werkzeugaufruf aus und gib keine weitere Antwort aus.`
+
+---
+
+## 3. Non-prompt issues
+
+| Issue | Recommendation |
+|-------|----------------|
+| **Strong “helpful over-action” bias** | The model bundles related controls (AC, fan, windows) even when the prompt does not ask for them. If the benchmark expects strictly minimal action sets, few-shot demonstrations of minimal, single-tool responses will likely be more effective than prompt text alone. |
+| **Domain gap for seat heating / ventilated seats** | In `disambiguation_12` the model never checks seat heating status. This suggests the model does not associate warmth complaints with seat heating. A</pre></section>
+</main>

@@ -200,6 +200,41 @@ PROMPT_VARIANTS: dict[str, dict[str, str]] = {
             " Nutzer immer auf Englisch und halte Antworten kurz."
         ),
     },
+    # v5 (round 6): v4_german + wide selfcheck-run judge fixes — verify state
+    # via getter tools before modifying (cluster C), never invent policy/safety
+    # constraints or confirmation requirements (cluster D), execute confirmed
+    # actions completely incl. symmetric "both" requests (clusters E/F).
+    # Parent: v4_german. Run WITH self-check enabled.
+    "v5_german": {
+        "prefix": "",
+        "suffix": (
+            "\n\nArbeitsregeln, in Prioritätsreihenfolge:\n"
+            "1. Belege jede Aussage mit Werkzeugergebnissen: Behaupte niemals,"
+            " dass eine Aktion ausgeführt wurde oder wird, ohne dass du das"
+            " zugehörige Werkzeug in diesem Gespräch aufgerufen und ein"
+            " Erfolgsergebnis erhalten hast. Wenn eine Funktion oder"
+            " Information über deine Werkzeuge nicht verfügbar ist, sage das"
+            " offen, statt zu improvisieren.\n"
+            "2. Prüfe den Ist-Zustand mit den Abfrage-Werkzeugen, bevor du"
+            " eine Komponente veränderst; behandle die Beschreibung des"
+            " Nutzers nicht als Sensordaten.\n"
+            "3. Erfinde niemals Sicherheitsregeln, Bestätigungspflichten oder"
+            " technische Abhängigkeiten, die nicht ausdrücklich in den"
+            " Richtlinien stehen. Schweigen die Richtlinien, führe die"
+            " Anfrage direkt aus, statt eine Bestätigung zu verlangen.\n"
+            "4. Behandle jede Anfrage so minimal wie möglich: Führe nur die"
+            " explizit angeforderten Aktionen aus, es sei denn, die"
+            " Richtlinien schreiben eine zusätzliche Aktion zwingend vor.\n"
+            "5. Löse Mehrdeutigkeiten zuerst selbst über gespeicherte"
+            " Nutzerpräferenzen und Richtlinien-Standardwerte; frage nur,"
+            " wenn beides nicht auflöst, und gib am Ende genau eine Antwort.\n"
+            "6. Führe bestätigte Aktionen sofort und vollständig aus — bei"
+            " Anfragen über mehrere Komponenten (z. B. beide Sitze, alle"
+            " Fenster) für jede einzelne Komponente.\n"
+            "7. Die Richtlinien haben immer Vorrang. Antworte dem Nutzer"
+            " immer auf Englisch und halte Antworten kurz."
+        ),
+    },
     # Explicitly ask for German internal reasoning with English output.
     "german_reasoning": {
         "prefix": "",

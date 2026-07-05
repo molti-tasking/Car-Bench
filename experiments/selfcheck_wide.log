@@ -1,0 +1,222 @@
+[32m2026-07-05 15:45:41.305[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mLoaded scenario file[0m | path=experiments/scenarios/20260705-134537-v4_german+selfcheck-train.toml
+[32m2026-07-05 15:45:41.305[0m | [1mINFO    [0m | [36morchestrator[0m | [1mStarting agent under test[0m
+[32m2026-07-05 15:45:41.310[0m | [1mINFO    [0m | [36morchestrator[0m | [1mStarting evaluator[0m
+[32m2026-07-05 15:45:41.313[0m | [1mINFO    [0m | [36morchestrator[0m | [1mWaiting for 2 agent(s) to be ready[0m
+[32m2026-07-05 15:45:41.506[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8080 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:41.511[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8081 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:41.511[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8080 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:41.511[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8081 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:42.518[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8080 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:42.523[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8081 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:42.523[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8080 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:42.523[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8081 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:43.531[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8080 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:43.537[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8081 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:43.537[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8080 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:43.537[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8081 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:44.554[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8080 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:44.569[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8081 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:44.569[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8080 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:44.569[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8081 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:45.585[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8080 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:45.596[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8081 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:45.596[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8080 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:45.596[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8081 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:46.607[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8080 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:46.616[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8081 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:46.616[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8080 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:46.616[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8081 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:47.626[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8080 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:47.630[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8081 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:47.630[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8080 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:47.630[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8081 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:48.642[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8080 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:48.649[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8081 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:48.649[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8080 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:48.649[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8081 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:49.660[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8080 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:49.667[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8081 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:49.667[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8080 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:49.667[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8081 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:50.678[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8080 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:50.685[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8081 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:50.686[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8080 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:50.686[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8081 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:51.699[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8080 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:51.705[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8081 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:51.705[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8080 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:51.705[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8081 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:52.720[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8080 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:52.730[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent readiness check failed[0m | endpoint=http://127.0.0.1:8081 | error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:52.730[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8080 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8080/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:52.730[0m | [34m[1mDEBUG   [0m | [36morchestrator[0m | [34m[1mAgent not ready yet[0m | endpoint=http://127.0.0.1:8081 | last_error=AgentCardResolutionError: Network communication error fetching agent card from http://127.0.0.1:8081/.well-known/agent-card.json: All connection attempts failed
+[32m2026-07-05 15:45:53.761[0m | [1mINFO    [0m | [36morchestrator[0m | [1mAll agents ready[0m
+[32m2026-07-05 15:45:53.761[0m | [1mINFO    [0m | [36morchestrator[0m | [1mAgents started successfully[0m
+[32m2026-07-05 15:45:53.761[0m | [1mINFO    [0m | [36morchestrator[0m | [1mStarting evaluation client[0m
+CAR-bench Results
+Tasks: 135
+Overall Pass Rate: 82.2% (111.0/135)
+Time: 5847.3s
+Successful LLM Time: 1613.0s
+
+Pass Scores:
+  Pass^1: 82.2%  |  Pass@1: 82.2%
+  Pass^2: 77.8%  |  Pass@2: 88.9%
+  Pass^3: 73.3%  |  Pass@3: 91.1%
+
+Task Results by Split:
+  Base: 93.3% (42.0/45)
+    Task base_0: ✓ (1.00)
+    Task base_2: ✓ (1.00)
+    Task base_4: ✓ (1.00)
+    Task base_6: ✓ (1.00)
+    Task base_8: ✓ (1.00)
+    Task base_10: ✓ (1.00)
+    Task base_12: ✓ (1.00)
+    Task base_14: ✗ (0.00)
+    Task base_16: ✓ (1.00)
+    Task base_18: ✓ (1.00)
+    Task base_20: ✓ (1.00)
+    Task base_22: ✓ (1.00)
+    Task base_24: ✓ (1.00)
+    Task base_26: ✓ (1.00)
+    Task base_28: ✓ (1.00)
+    Task base_0: ✓ (1.00)
+    Task base_2: ✓ (1.00)
+    Task base_4: ✓ (1.00)
+    Task base_6: ✓ (1.00)
+    Task base_8: ✓ (1.00)
+    Task base_10: ✓ (1.00)
+    Task base_12: ✓ (1.00)
+    Task base_14: ✓ (1.00)
+    Task base_16: ✓ (1.00)
+    Task base_18: ✓ (1.00)
+    Task base_20: ✓ (1.00)
+    Task base_22: ✓ (1.00)
+    Task base_24: ✗ (0.00)
+    Task base_26: ✓ (1.00)
+    Task base_28: ✓ (1.00)
+    Task base_0: ✓ (1.00)
+    Task base_2: ✓ (1.00)
+    Task base_4: ✓ (1.00)
+    Task base_6: ✓ (1.00)
+    Task base_8: ✓ (1.00)
+    Task base_10: ✓ (1.00)
+    Task base_12: ✓ (1.00)
+    Task base_14: ✗ (0.00)
+    Task base_16: ✓ (1.00)
+    Task base_18: ✓ (1.00)
+    Task base_20: ✓ (1.00)
+    Task base_22: ✓ (1.00)
+    Task base_24: ✓ (1.00)
+    Task base_26: ✓ (1.00)
+    Task base_28: ✓ (1.00)
+
+  Hallucination: 82.2% (37.0/45)
+    Task hallucination_0: ✗ (0.00)
+    Task hallucination_2: ✓ (1.00)
+    Task hallucination_4: ✓ (1.00)
+    Task hallucination_6: ✓ (1.00)
+    Task hallucination_8: ✓ (1.00)
+    Task hallucination_10: ✗ (0.00)
+    Task hallucination_12: ✓ (1.00)
+    Task hallucination_14: ✓ (1.00)
+    Task hallucination_16: ✗ (0.00)
+    Task hallucination_18: ✓ (1.00)
+    Task hallucination_20: ✓ (1.00)
+    Task hallucination_22: ✓ (1.00)
+    Task hallucination_24: ✓ (1.00)
+    Task hallucination_26: ✓ (1.00)
+    Task hallucination_28: ✓ (1.00)
+    Task hallucination_0: ✓ (1.00)
+    Task hallucination_2: ✓ (1.00)
+    Task hallucination_4: ✓ (1.00)
+    Task hallucination_6: ✓ (1.00)
+    Task hallucination_8: ✓ (1.00)
+    Task hallucination_10: ✗ (0.00)
+    Task hallucination_12: ✓ (1.00)
+    Task hallucination_14: ✓ (1.00)
+    Task hallucination_16: ✗ (0.00)
+    Task hallucination_18: ✓ (1.00)
+    Task hallucination_20: ✓ (1.00)
+    Task hallucination_22: ✓ (1.00)
+    Task hallucination_24: ✗ (0.00)
+    Task hallucination_26: ✓ (1.00)
+    Task hallucination_28: ✓ (1.00)
+    Task hallucination_0: ✓ (1.00)
+    Task hallucination_2: ✓ (1.00)
+    Task hallucination_4: ✓ (1.00)
+    Task hallucination_6: ✓ (1.00)
+    Task hallucination_8: ✓ (1.00)
+    Task hallucination_10: ✓ (1.00)
+    Task hallucination_12: ✓ (1.00)
+    Task hallucination_14: ✓ (1.00)
+    Task hallucination_16: ✗ (0.00)
+    Task hallucination_18: ✓ (1.00)
+    Task hallucination_20: ✓ (1.00)
+    Task hallucination_22: ✓ (1.00)
+    Task hallucination_24: ✗ (0.00)
+    Task hallucination_26: ✓ (1.00)
+    Task hallucination_28: ✓ (1.00)
+
+  Disambiguation: 71.1% (32.0/45)
+    Task disambiguation_0: ✓ (1.00)
+    Task disambiguation_2: ✓ (1.00)
+    Task disambiguation_4: ✓ (1.00)
+    Task disambiguation_6: ✓ (1.00)
+    Task disambiguation_8: ✓ (1.00)
+    Task disambiguation_10: ✓ (1.00)
+    Task disambiguation_12: ✗ (0.00)
+    Task disambiguation_14: ✗ (0.00)
+    Task disambiguation_16: ✓ (1.00)
+    Task disambiguation_18: ✓ (1.00)
+    Task disambiguation_20: ✓ (1.00)
+    Task disambiguation_22: ✗ (0.00)
+    Task disambiguation_24: ✓ (1.00)
+    Task disambiguation_26: ✓ (1.00)
+    Task disambiguation_28: ✗ (0.00)
+    Task disambiguation_0: ✓ (1.00)
+    Task disambiguation_2: ✓ (1.00)
+    Task disambiguation_4: ✓ (1.00)
+    Task disambiguation_6: ✓ (1.00)
+    Task disambiguation_8: ✓ (1.00)
+    Task disambiguation_10: ✓ (1.00)
+    Task disambiguation_12: ✗ (0.00)
+    Task disambiguation_14: ✗ (0.00)
+    Task disambiguation_16: ✓ (1.00)
+    Task disambiguation_18: ✓ (1.00)
+    Task disambiguation_20: ✓ (1.00)
+    Task disambiguation_22: ✗ (0.00)
+    Task disambiguation_24: ✓ (1.00)
+    Task disambiguation_26: ✓ (1.00)
+    Task disambiguation_28: ✓ (1.00)
+    Task disambiguation_0: ✗ (0.00)
+    Task disambiguation_2: ✓ (1.00)
+    Task disambiguation_4: ✗ (0.00)
+    Task disambiguation_6: ✓ (1.00)
+    Task disambiguation_8: ✓ (1.00)
+    Task disambiguation_10: ✓ (1.00)
+    Task disambiguation_12: ✗ (0.00)
+    Task disambiguation_14: ✗ (0.00)
+    Task disambiguation_16: ✓ (1.00)
+    Task disambiguation_18: ✓ (1.00)
+    Task disambiguation_20: ✓ (1.00)
+    Task disambiguation_22: ✗ (0.00)
+    Task disambiguation_24: ✓ (1.00)
+    Task disambiguation_26: ✓ (1.00)
+    Task disambiguation_28: ✗ (0.00)
+
+Results written to experiments/raw/20260705-134537-v4_german+selfcheck-train.json
+[32m2026-07-05 17:23:22.349[0m | [1mINFO    [0m | [36morchestrator[0m | [1mShutting down agents[0m
+[experiment] run_id=20260705-134537-v4_german+selfcheck-train
+[experiment] variant=v4_german split=train tasks/category=15 trials=3 model=litellm_proxy/natai/glm
+
+[experiment] ===== run summary =====
+  run_id:     20260705-134537-v4_german+selfcheck-train
+  score:      111.0/135.0 (pass_rate 82.22222222222221)
+  Pass^k:     {'Pass^2': 0.7777777777777777, 'Pass^3': 0.7333333333333334, 'Pass^1': 0.8222222222222223}
+  Pass@k:     {'Pass@1': 0.8222222222222223, 'Pass@2': 0.888888888888889, 'Pass@3': 0.9111111111111111}
+  cost:       $0.0 agent-side, 6186034 tokens
+  failures:   24/135 trial rows
+  raw result: experiments/raw/20260705-134537-v4_german+selfcheck-train.json
+  next:       uv run python tools/experiment.py analyze --run 20260705-134537-v4_german+selfcheck-train
