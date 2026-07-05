@@ -111,6 +111,24 @@ cites run evidence. The leaderboard says *what* won; this file says *why*.
   to ask a clarifying question without having called get_user_preferences)
   targeting the Disambiguation Pass^3 ceiling.
 
+## 2026-07-05 — Round 7 (ask-gate) and plateau declaration
+
+- **Ask-gate: Pass^3 73.3% — third consecutive configuration at exactly this
+  number** (`20260705-171624`). Target category improved (Disambiguation
+  60→67) but Base paid (87→80): the "?"-heuristic occasionally derails
+  straightforward flows with unneeded lookups.
+- **Plateau is real, not noise**: only 1–3 failing rows per run (4–12%) are
+  simulator misfire artifacts → true ceiling ≈ 73–75% Pass^3 for
+  GLM + prompt + single-pass verification on this benchmark.
+- **Final champion: v4_german + self-check** (Pass^3 73.3%, Pass@3 91.1%,
+  pass rate 82.2%) — wins the Pass@3 tiebreak over v5 (86.7) and ask-gate
+  (86.7). Ask-gate stays in the codebase (env-gated off) as an ablation.
+- Campaign arc for the report: baseline 71.1% → prompt engineering
+  plateaued at ≤71.1% (trades categories) → verification harness broke to
+  73.3% (composes) → further gating shuffles but doesn't lift. The
+  remaining Pass@3−Pass^3 gap (~18pp) is trial-to-trial inconsistency of a
+  capable model — the benchmark's core thesis, reproduced.
+
 ## Open questions
 
 - Does XML markup of the same protocol content change GLM's adherence?
