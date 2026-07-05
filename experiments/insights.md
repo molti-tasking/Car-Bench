@@ -80,6 +80,24 @@ cites run evidence. The leaderboard says *what* won; this file says *why*.
   evaluator (EVALUATOR_LLM_TIMEOUT), commit dd1befe. Baseline's 3-trial run
   was interrupted (user stop); its single-trial 86.7% stands as reference.
 
+## 2026-07-05 — Round 5 (wide 45-task runs: anchors, v4, self-check harness)
+
+- **New champion: v4_german + self-check — Pass^3 73.3%, Pass@3 91.1%, pass
+  rate 82.2%** (`20260705-134537`). First configuration to beat baseline at
+  full width. Token cost +32% (~6.2M/run vs ~4.7M).
+- **Wide baseline anchor: Pass^3 71.1%** — which means *no prompt variant
+  alone beats no-prompt at 45 tasks* (v4_german ties 71.1%, german_protocol
+  66.7%). The 15-task German-language advantage did not generalize —
+  subset effects can invert at scale; always anchor at equal width.
+- **v4_german traded categories, not totals**: minimalism/defaults rules
+  lifted Disambiguation 40→60% and Hallucination 67→73% Pass^3 but dropped
+  Base 93→80% (over-minimalism suppresses required auxiliary actions).
+  Self-check on top recovered Base to 87% while keeping the gains
+  (87/73/60) — verification composes where prompting trades off.
+- **Ops lesson**: harness-managed background tasks die on laptop
+  sleep/wake; detached `nohup` processes survive. Long runs must be
+  launched detached with a disposable registry watcher.
+
 ## Open questions
 
 - Does XML markup of the same protocol content change GLM's adherence?
