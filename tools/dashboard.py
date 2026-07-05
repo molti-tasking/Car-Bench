@@ -84,12 +84,18 @@ def max_passk(d: dict | None) -> float | None:
 
 
 def latest_comparable(runs: list[dict]) -> list[dict]:
-    """Latest run per variant at the largest common tasks_per_category (>1)."""
+    """Latest run per variant at the widest task width measured so far.
+
+    Mixing widths misleads (small subsets score higher), so only variants
+    measured at the maximum tasks_per_category compete for 'best'.
+    """
     real = [r for r in runs if r["tasks_per_category"] not in (0, 1)]
     if not real:
         real = runs
+    max_width = max(r["tasks_per_category"] for r in real)
+    widest = [r for r in real if r["tasks_per_category"] == max_width]
     by_variant: dict[str, dict] = {}
-    for r in real:
+    for r in widest:
         by_variant[r["variant"]] = r  # registry is chronological; last wins
     return list(by_variant.values())
 
