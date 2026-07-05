@@ -84,7 +84,8 @@ def cmd_run(args: argparse.Namespace) -> None:
         tasks = -1 if args.full else args.tasks
         trials = args.trials
 
-    run_id = f"{_now_utc().strftime('%Y%m%d-%H%M%S')}-{args.variant}-{split}"
+    variant_label = args.variant + ("+selfcheck" if args.self_check else "")
+    run_id = f"{_now_utc().strftime('%Y%m%d-%H%M%S')}-{variant_label}-{split}"
     raw_path = RAW_DIR / f"{run_id}.json"
     scenario_path = SCENARIOS_DIR / f"{run_id}.toml"
 
@@ -136,6 +137,8 @@ def cmd_run(args: argparse.Namespace) -> None:
     env["RUN_ID"] = run_id
     if args.model:
         env["AGENT_LLM"] = args.model
+    if args.self_check:
+        env["AGENT_SELF_CHECK"] = "true"
 
     print(f"[experiment] run_id={run_id}")
     print(f"[experiment] variant={args.variant} split={split} tasks/category={tasks} trials={trials}"
@@ -171,7 +174,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         "run_id": run_id,
         "started_at": started_at.isoformat(),
         "finished_at": finished_at.isoformat(),
-        "variant": args.variant,
+        "variant": variant_label,
         "model": payload.get("metadata", {}).get("model") or env.get("AGENT_LLM", "gemini/gemini-2.5-flash"),
         "split": split,
         "tasks_per_category": tasks,
@@ -339,6 +342,7 @@ def main() -> None:
     p_run.add_argument("--full", action="store_true", help="Run all tasks of the split (overrides --tasks)")
     p_run.add_argument("--trials", type=int, default=1, help="Trials per task (3 needed for Pass^3)")
     p_run.add_argument("--model", default=None, help="Override AGENT_LLM for this run")
+    p_run.add_argument("--self-check", action="store_true", help="Enable the agent's pre-send self-check pass")
     p_run.add_argument("--smoke", action="store_true", help="Shortcut: train split, 1 task/category, 1 trial")
     p_run.set_defaults(func=cmd_run)
 

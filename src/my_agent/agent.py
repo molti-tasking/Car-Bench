@@ -15,6 +15,8 @@ import sys
 import time
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.helpers.proto_helpers import new_message, new_text_part, new_data_part
@@ -36,6 +38,26 @@ sys.path.pop(0)
 logger = configure_logger(role="agent_under_test", context="-")
 
 
+class SelfCheckVerdict(BaseModel):
+    """Structured verdict of the pre-send self-check pass."""
+    ok: bool
+    revised_response: str | None = None
+
+
+SELF_CHECK_PROMPT = """Du prüfst den Antwortentwurf eines Auto-Sprachassistenten \
+vor dem Absenden. Melde NUR diese zwei Fehler:
+1. Der Entwurf behauptet, eine Aktion oder Zustandsänderung sei erfolgt oder \
+erfolge automatisch, obwohl kein passender erfolgreicher Werkzeugaufruf in der \
+Aufruf-Liste steht (auch: eine andere Komponente habe sich "mitbewegt").
+2. Der Nutzer hat eine Aktion bestätigt, aber kein Werkzeugaufruf hat sie \
+ausgeführt, und der Entwurf tut so, als sei sie erledigt.
+
+Wenn keiner der beiden Fehler vorliegt: ok=true, revised_response=null. \
+Ändere NICHTS anderes (keine Stilfragen, keine zusätzlichen Rückfragen). \
+Wenn ein Fehler vorliegt: ok=false und eine minimal korrigierte Antwort auf \
+Englisch, die nur belegte Aussagen enthält."""
+
+
 class MyAgentExecutor(AgentExecutor):
     """Executor for the CAR-bench agent under test using native tool calling."""
 
@@ -48,7 +70,11 @@ class MyAgentExecutor(AgentExecutor):
         api_base: str | None = None,
         system_prompt_prefix: str = "",
         system_prompt_suffix: str = "",
+        self_check: bool = False,
+        self_check_model: str | None = None,
     ):
+        self.self_check = self_check
+        self.self_check_model = self_check_model
         self.model = model
         self.temperature = temperature
         self.reasoning_effort = reasoning_effort
@@ -60,6 +86,57 @@ class MyAgentExecutor(AgentExecutor):
         self.ctx_id_to_tools: dict[str, list[dict]] = {}
         # Per-context turn metrics accumulation (reset when final response is sent)
         self.ctx_id_to_turn_metrics: dict[str, dict] = {}
+
+    def _run_self_check(self, messages: list[dict], draft: str, turn_m: dict) -> str | None:
+        """One verification pass before a user-facing reply is sent.
+
+        Returns a revised response iff the draft claims an unexecuted action;
+        otherwise None. Any checker failure degrades to sending the draft.
+        """
+        tool_log = []
+        pending_names: list[str] = []
+        for m in messages:
+            if m.get("role") == "assistant" and m.get("tool_calls"):
+                pending_names = [tc["function"]["name"] for tc in m["tool_calls"]]
+            elif m.get("role") == "tool":
+                name = pending_names.pop(0) if pending_names else "?"
+                content = str(m.get("content") or "")
+                status = "SUCCESS" if '"status": "SUCCESS"' in content or "'status': 'SUCCESS'" in content else "OTHER"
+                tool_log.append(f"{name} -> {status}")
+        recent_user = [str(m.get("content") or "")[:300] for m in messages if m.get("role") == "user"][-3:]
+
+        check_input = (
+            f"Werkzeugaufrufe in diesem Gespräch (Reihenfolge, mit Status):\n"
+            f"{json.dumps(tool_log, ensure_ascii=False)}\n\n"
+            f"Letzte Nutzernachrichten:\n{json.dumps(recent_user, ensure_ascii=False)}\n\n"
+            f"Antwortentwurf:\n{draft}"
+        )
+        completion_kwargs = {
+            "model": self.self_check_model or self.model,
+            "temperature": 0.0,
+            "timeout": float(os.getenv("AGENT_LLM_TIMEOUT", "300")),
+            "response_format": SelfCheckVerdict,
+        }
+        if self.api_key:
+            completion_kwargs["api_key"] = self.api_key
+        if self.api_base:
+            completion_kwargs["api_base"] = self.api_base
+        response = completion(
+            messages=[
+                {"role": "system", "content": SELF_CHECK_PROMPT},
+                {"role": "user", "content": check_input},
+            ],
+            **completion_kwargs,
+        )
+        usage = getattr(response, "usage", None)
+        if usage:
+            turn_m[PROMPT_TOKENS] += getattr(usage, "prompt_tokens", 0) or 0
+            turn_m[COMPLETION_TOKENS] += getattr(usage, "completion_tokens", 0) or 0
+        turn_m[NUM_LLM_CALLS] += 1
+        verdict = SelfCheckVerdict.model_validate(json.loads(response.choices[0].message.content))
+        if not verdict.ok and verdict.revised_response:
+            return verdict.revised_response
+        return None
 
     def _build_system_prompt(self, evaluator_system_prompt: str) -> str:
         """Wrap the evaluator-provided policy prompt with the configured variant.
@@ -212,6 +289,17 @@ class MyAgentExecutor(AgentExecutor):
             llm_message = response.choices[0].message
             assistant_content = llm_message.model_dump(exclude_unset=True)
             tool_calls = assistant_content.get("tool_calls")
+
+            # Optional pre-send self-check on user-facing replies (no tool
+            # calls this turn): catches claimed-but-unexecuted actions.
+            if self.self_check and not tool_calls and assistant_content.get("content"):
+                try:
+                    revised = self._run_self_check(messages, assistant_content["content"], turn_m)
+                    if revised:
+                        ctx_logger.info("Self-check revised the draft response")
+                        assistant_content["content"] = revised
+                except Exception as check_err:
+                    ctx_logger.warning(f"Self-check failed, sending draft: {check_err}")
 
             ctx_logger.info(
                 "LLM response received",

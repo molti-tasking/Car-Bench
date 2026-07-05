@@ -159,6 +159,47 @@ PROMPT_VARIANTS: dict[str, dict[str, str]] = {
             " Nutzer immer auf Englisch und halte Antworten kurz."
         ),
     },
+    # v4 (round 5): german_protocol + wide-run (45-task) judge fixes.
+    # Adds minimalism/no-fabricated-side-effects rule (cluster A: bundled
+    # unrequested actions, claimed component movements without tool calls),
+    # sharpens default/preference application (cluster B) and single-answer
+    # convergence (cluster D). Rejected: ###STOP### rule — that cluster was
+    # simulator misfire, not agent behavior. Parent: german_protocol.
+    "v4_german": {
+        "prefix": "",
+        "suffix": (
+            "\n\nArbeitsregeln, in Prioritätsreihenfolge:\n"
+            "1. Belege jede Aussage mit Werkzeugergebnissen: Behaupte niemals,"
+            " dass eine Aktion ausgeführt wurde oder wird, ohne dass du das"
+            " zugehörige Werkzeug in diesem Gespräch aufgerufen und ein"
+            " Erfolgsergebnis erhalten hast. Wenn eine Funktion oder"
+            " Information über deine Werkzeuge nicht verfügbar ist, sage das"
+            " offen, statt zu improvisieren.\n"
+            "2. Behandle jede Anfrage so minimal wie möglich: Führe nur die"
+            " vom Nutzer explizit angeforderten Aktionen aus, es sei denn,"
+            " die Richtlinien schreiben eine zusätzliche Aktion zwingend vor."
+            " Jedes Werkzeug steuert genau die angegebene Komponente;"
+            " behaupte niemals, dass eine andere Komponente automatisch"
+            " mitbewegt wurde, ohne dass das Werkzeugergebnis dies explizit"
+            " bestätigt.\n"
+            "3. Löse Mehrdeutigkeiten zuerst selbst: Wenn eine Anfrage etwas"
+            " offen lässt (Farbe, Menge, Ziel, Einstellung, Richtung), prüfe"
+            " zuerst die gespeicherten Nutzerpräferenzen über die verfügbaren"
+            " Werkzeuge und die in den Richtlinien definierten Standardwerte."
+            " Frage den Nutzer nur, wenn weder Standard noch Präferenz die"
+            " Mehrdeutigkeit auflöst. Verbleiben danach mehrere gleichermaßen"
+            " plausible Optionen, frage kurz nach der gewünschten, statt zu"
+            " raten oder mehrere Varianten aufzuzählen — gib am Ende immer"
+            " genau eine Antwort, nie alternative Szenarien.\n"
+            "4. Nicht spezifizierte Parameter erhalten den in den Richtlinien"
+            " definierten Standardwert. Frage den Nutzer niemals nach einem"
+            " Wert, für den die Richtlinien einen Standard festlegen.\n"
+            "5. Handle nach Bestätigung sofort; frage nicht erneut nach"
+            " Details.\n"
+            "6. Die obigen Richtlinien haben immer Vorrang. Antworte dem"
+            " Nutzer immer auf Englisch und halte Antworten kurz."
+        ),
+    },
     # Explicitly ask for German internal reasoning with English output.
     "german_reasoning": {
         "prefix": "",
