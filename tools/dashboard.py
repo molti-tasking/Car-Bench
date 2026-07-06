@@ -92,8 +92,11 @@ def latest_comparable(runs: list[dict]) -> list[dict]:
     real = [r for r in runs if r["tasks_per_category"] not in (0, 1)]
     if not real:
         real = runs
-    max_width = max(r["tasks_per_category"] for r in real)
-    widest = [r for r in real if r["tasks_per_category"] == max_width]
+    def _w(r):
+        n = r["tasks_per_category"]
+        return float("inf") if n == -1 else n
+    max_width = max(_w(r) for r in real)
+    widest = [r for r in real if _w(r) == max_width]
     by_variant: dict[str, dict] = {}
     for r in widest:
         by_variant[r["variant"]] = r  # registry is chronological; last wins

@@ -129,6 +129,18 @@ cites run evidence. The leaderboard says *what* won; this file says *why*.
   remaining Pass@3−Pass^3 gap (~18pp) is trial-to-trial inconsistency of a
   capable model — the benchmark's core thesis, reproduced.
 
+## 2026-07-06 — Full public test-set measurement
+
+- **Champion generalizes: v4_german+selfcheck on the full test split (125
+  tasks × 3 trials) — Pass^3 71.3%, Pass@3 89.3%, pass rate 83.7%**
+  (`20260705-235030`). Only ~2pp below its train-wide number → the
+  train-fitted rules transfer. Category shift on unseen tasks: Base 78
+  (weaker), Hallucination 76 (stronger), Disambiguation 60 (same).
+- 31.4M agent tokens for the run (~84k/task-trial). Baseline test run in
+  progress for the comparison gap.
+- The ~18pp Pass@3−Pass^3 consistency gap persists on test — the voting
+  harness (built, unmeasured) targets exactly this.
+
 ## Open questions
 
 - Does XML markup of the same protocol content change GLM's adherence?
