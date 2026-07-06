@@ -84,7 +84,9 @@ def cmd_run(args: argparse.Namespace) -> None:
         tasks = -1 if args.full else args.tasks
         trials = args.trials
 
-    variant_label = args.variant + ("+selfcheck" if args.self_check else "") + ("+askgate" if args.ask_gate else "")
+    variant_label = (args.variant + ("+selfcheck" if args.self_check else "")
+                     + ("+askgate" if args.ask_gate else "")
+                     + (f"+vote{args.vote}" if args.vote else ""))
     run_id = f"{_now_utc().strftime('%Y%m%d-%H%M%S')}-{variant_label}-{split}"
     raw_path = RAW_DIR / f"{run_id}.json"
     scenario_path = SCENARIOS_DIR / f"{run_id}.toml"
@@ -141,6 +143,8 @@ def cmd_run(args: argparse.Namespace) -> None:
         env["AGENT_SELF_CHECK"] = "true"
     if args.ask_gate:
         env["AGENT_ASK_GATE"] = "true"
+    if args.vote:
+        env["AGENT_VOTE_K"] = str(args.vote)
 
     print(f"[experiment] run_id={run_id}")
     print(f"[experiment] variant={args.variant} split={split} tasks/category={tasks} trials={trials}"
@@ -346,6 +350,7 @@ def main() -> None:
     p_run.add_argument("--model", default=None, help="Override AGENT_LLM for this run")
     p_run.add_argument("--self-check", action="store_true", help="Enable the agent's pre-send self-check pass")
     p_run.add_argument("--ask-gate", action="store_true", help="Enable the preference-lookup nudge before clarifying questions")
+    p_run.add_argument("--vote", type=int, default=0, help="Self-consistency voting: K samples per turn (0 = off)")
     p_run.add_argument("--smoke", action="store_true", help="Shortcut: train split, 1 task/category, 1 trial")
     p_run.set_defaults(func=cmd_run)
 

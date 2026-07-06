@@ -44,6 +44,25 @@ class SelfCheckVerdict(BaseModel):
     revised_response: str | None = None
 
 
+def _action_signature(message) -> str:
+    """Canonical signature of a model decision, for majority voting.
+
+    Tool-call turns vote on the multiset of (tool, canonical-args); pure
+    text replies all share the 'respond' signature.
+    """
+    tool_calls = getattr(message, "tool_calls", None) or []
+    if not tool_calls:
+        return "respond"
+    parts = []
+    for tc in tool_calls:
+        try:
+            args = json.dumps(json.loads(tc.function.arguments), sort_keys=True)
+        except Exception:
+            args = str(tc.function.arguments)
+        parts.append(f"{tc.function.name}({args})")
+    return "|".join(sorted(parts))
+
+
 ASK_GATE_NUDGE = (
     "Interner Hinweis: Du wolltest gerade eine Rückfrage stellen. Prüfe zuerst"
     " mit get_user_preferences (mit passenden Kategorien) und den in den"
@@ -81,10 +100,14 @@ class MyAgentExecutor(AgentExecutor):
         self_check: bool = False,
         self_check_model: str | None = None,
         ask_gate: bool = False,
+        vote_k: int = 0,
+        vote_temperature: float = 0.7,
     ):
         self.self_check = self_check
         self.self_check_model = self_check_model
         self.ask_gate = ask_gate
+        self.vote_k = vote_k
+        self.vote_temperature = vote_temperature
         self.model = model
         self.temperature = temperature
         self.reasoning_effort = reasoning_effort
@@ -96,6 +119,54 @@ class MyAgentExecutor(AgentExecutor):
         self.ctx_id_to_tools: dict[str, list[dict]] = {}
         # Per-context turn metrics accumulation (reset when final response is sent)
         self.ctx_id_to_turn_metrics: dict[str, dict] = {}
+
+    def _vote_completion(self, messages: list[dict], completion_kwargs: dict, turn_m: dict, ctx_logger):
+        """Self-consistency voting: sample K decisions, majority-vote on the
+        action signature. Ties/no-majority fall back to a temperature-0 call.
+
+        Pass^3 rewards consistency; voting converts 'right most of the time'
+        into 'right almost always'. Track 1 has no compute constraints.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+
+        def _one(temp: float):
+            kwargs = dict(completion_kwargs)
+            kwargs["temperature"] = temp
+            return completion(messages=messages, **kwargs)
+
+        with ThreadPoolExecutor(max_workers=self.vote_k) as pool:
+            futures = [pool.submit(_one, self.vote_temperature) for _ in range(self.vote_k)]
+            responses = []
+            for f in futures:
+                try:
+                    responses.append(f.result())
+                except Exception as e:
+                    ctx_logger.warning(f"Vote sample failed: {e}")
+
+        for r in responses:
+            usage = getattr(r, "usage", None)
+            if usage:
+                turn_m[PROMPT_TOKENS] += getattr(usage, "prompt_tokens", 0) or 0
+                turn_m[COMPLETION_TOKENS] += getattr(usage, "completion_tokens", 0) or 0
+            turn_m[NUM_LLM_CALLS] += 1
+
+        votes: dict[str, list] = {}
+        for r in responses:
+            votes.setdefault(_action_signature(r.choices[0].message), []).append(r)
+        if votes:
+            best_sig, best = max(votes.items(), key=lambda kv: len(kv[1]))
+            if len(best) > self.vote_k // 2 or len(votes) == 1:
+                ctx_logger.info("Vote decided", signature=best_sig[:80], votes=f"{len(best)}/{len(responses)}")
+                return best[0]
+        # No majority: deterministic anchor call
+        ctx_logger.info("Vote inconclusive; falling back to temperature-0 call")
+        response = _one(0.0)
+        usage = getattr(response, "usage", None)
+        if usage:
+            turn_m[PROMPT_TOKENS] += getattr(usage, "prompt_tokens", 0) or 0
+            turn_m[COMPLETION_TOKENS] += getattr(usage, "completion_tokens", 0) or 0
+        turn_m[NUM_LLM_CALLS] += 1
+        return response
 
     def _run_self_check(self, messages: list[dict], draft: str, turn_m: dict) -> str | None:
         """One verification pass before a user-facing reply is sent.
@@ -273,7 +344,15 @@ class MyAgentExecutor(AgentExecutor):
                 completion_kwargs["metadata"] = trace_metadata(context.context_id)
 
             call_start_time = time.perf_counter()
-            response = completion(messages=messages, **completion_kwargs)
+            if self.vote_k >= 2:
+                # turn_m must exist before voting accumulates usage into it
+                turn_m = self.ctx_id_to_turn_metrics.setdefault(context.context_id, {
+                    PROMPT_TOKENS: 0, COMPLETION_TOKENS: 0, THINKING_TOKENS: 0,
+                    COST: 0.0, NUM_LLM_CALLS: 0, "_total_llm_time_ms": 0.0,
+                })
+                response = self._vote_completion(messages, completion_kwargs, turn_m, ctx_logger)
+            else:
+                response = completion(messages=messages, **completion_kwargs)
             call_elapsed_ms = (time.perf_counter() - call_start_time) * 1000.0
 
             # Accumulate turn metrics for this LLM call
@@ -285,15 +364,16 @@ class MyAgentExecutor(AgentExecutor):
                 NUM_LLM_CALLS: 0,
                 "_total_llm_time_ms": 0.0,
             })
-            usage = getattr(response, "usage", None)
-            if usage:
-                turn_m[PROMPT_TOKENS] += getattr(usage, "prompt_tokens", 0) or 0
-                turn_m[COMPLETION_TOKENS] += getattr(usage, "completion_tokens", 0) or 0
-                details = getattr(usage, "completion_tokens_details", None)
-                if details:
-                    turn_m[THINKING_TOKENS] += getattr(details, "reasoning_tokens", 0) or 0
-            turn_m[COST] += getattr(response, "_hidden_params", {}).get("response_cost", 0.0) or 0.0
-            turn_m[NUM_LLM_CALLS] += 1
+            if self.vote_k < 2:  # voting already accumulated its samples' usage
+                usage = getattr(response, "usage", None)
+                if usage:
+                    turn_m[PROMPT_TOKENS] += getattr(usage, "prompt_tokens", 0) or 0
+                    turn_m[COMPLETION_TOKENS] += getattr(usage, "completion_tokens", 0) or 0
+                    details = getattr(usage, "completion_tokens_details", None)
+                    if details:
+                        turn_m[THINKING_TOKENS] += getattr(details, "reasoning_tokens", 0) or 0
+                turn_m[COST] += getattr(response, "_hidden_params", {}).get("response_cost", 0.0) or 0.0
+                turn_m[NUM_LLM_CALLS] += 1
             turn_m["_total_llm_time_ms"] += call_elapsed_ms
 
             llm_message = response.choices[0].message
