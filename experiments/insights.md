@@ -156,6 +156,17 @@ cites run evidence. The leaderboard says *what* won; this file says *why*.
   harness lifts deployment-readiness (Pass^3) by ~19pp over the raw model,
   almost entirely by suppressing hallucination.
 
+## 2026-07-08 — Self-consistency voting: confirmed dead end
+
+- **v4_german+selfcheck+vote3: Pass^3 71.1% vs champion 73.3%** (same 45-task
+  train set) — no gain, slightly worse, at 3× tokens (18.7M vs 6.2M). GLM's
+  residual errors are systematic, so K samples vote for the same wrong action;
+  voting can't fix errors the model makes consistently. Harness stays in code,
+  env-gated off, as a documented negative result.
+- **Capability-improvement phase closed.** Final submission config:
+  **v4_german + self-check** (test-set Pass^3 71.3%, +19.3pp over raw model).
+  Remaining work is packaging only (private repo, GHCR publish, report).
+
 ## Open questions
 
 - Does XML markup of the same protocol content change GLM's adherence?
