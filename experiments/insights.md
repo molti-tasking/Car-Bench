@@ -141,6 +141,21 @@ cites run evidence. The leaderboard says *what* won; this file says *why*.
 - The ~18pp Pass@3−Pass^3 consistency gap persists on test — the voting
   harness (built, unmeasured) targets exactly this.
 
+## 2026-07-08 — Baseline test-set anchor: the harness earns its keep
+
+- **Champion vs baseline on the FULL test set: Pass^3 71.3% vs 52.0% —
+  +19.3 points.** Entire gap is hallucination (champion 76%, baseline 22%):
+  unprompted GLM fabricates capabilities on ~4 of 5 hallucination trials; the
+  grounding rules + self-check hold it to ~1 in 4.
+- **Overturns the round-5 "no prompt beats prompting" finding as a subset
+  artifact.** The 45-task train slice was light on hallucination, so baseline
+  looked competitive (71.1%) there; on the real test distribution the harness
+  is decisive. Lesson: even 45-task subsets can misrank when category mix
+  differs from the full set — the headline comparison must be full-test.
+- This is the campaign's headline result for the report: prompt+verification
+  harness lifts deployment-readiness (Pass^3) by ~19pp over the raw model,
+  almost entirely by suppressing hallucination.
+
 ## Open questions
 
 - Does XML markup of the same protocol content change GLM's adherence?
