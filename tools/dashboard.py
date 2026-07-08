@@ -198,6 +198,122 @@ def trajectory(runs: list[dict], slots: dict[str, int]) -> str:
     return "".join(parts)
 
 
+def _task_pass3(raw_path: Path) -> dict:
+    """(split, task_id) -> passed all trials, from a run's raw payload."""
+    from collections import defaultdict
+    payload = json.loads(raw_path.read_text())
+    per = defaultdict(list)
+    for split, rows in (payload.get("final_result", {}).get("detailed_results_by_split") or {}).items():
+        for r in rows or []:
+            per[(split, r.get("task_id"))].append((r.get("reward") or 0) >= 1)
+    return {k: (len(v) >= 1 and all(v)) for k, v in per.items()}
+
+
+def rescue_sankey(runs: list[dict]) -> str:
+    """Alluvial: per-task Pass^3 state baseline -> champion on the test split.
+
+    Returns '' unless both a baseline and a champion full-test run exist.
+    """
+    def latest(pred):
+        hits = [r for r in runs if pred(r) and r["split"] == "test" and r["tasks_per_category"] == -1]
+        return hits[-1] if hits else None
+
+    champ = latest(lambda r: r["variant"] == "v4_german+selfcheck")
+    base = latest(lambda r: r["variant"] == "baseline")
+    if not (champ and base):
+        return ""
+    cpath, bpath = REPO_ROOT / champ["output_path"], REPO_ROOT / base["output_path"]
+    if not (cpath.exists() and bpath.exists()):
+        return ""
+    cp, bp = _task_pass3(cpath), _task_pass3(bpath)
+    common = set(cp) & set(bp)
+    if not common:
+        return ""
+
+    from collections import defaultdict
+    trans = defaultdict(int)      # transition -> count
+    hall_rescued = 0
+    for k in common:
+        b, c = bp[k], cp[k]
+        t = "stay_pass" if b and c else "rescued" if (not b and c) else "regressed" if (b and not c) else "stay_fail"
+        trans[t] += 1
+        if t == "rescued" and k[0] == "hallucination":
+            hall_rescued += 1
+    total = len(common)
+
+    W, H, xL, xR, nodeW, padT, padB = 680, 340, 150, 516, 14, 24, 40
+    plot_h = H - padT - padB
+    gap = 10
+    # node totals
+    L_pass = trans["stay_pass"] + trans["regressed"]
+    L_fail = trans["rescued"] + trans["stay_fail"]
+    R_pass = trans["stay_pass"] + trans["rescued"]
+    R_fail = trans["regressed"] + trans["stay_fail"]
+    scale = (plot_h - gap) / total
+
+    def seg(y0, count):
+        return y0, y0 + count * scale
+
+    # left node y-extents (pass on top, fail below the gap)
+    Lp0, Lp1 = seg(padT, L_pass)
+    Lf0, Lf1 = seg(Lp1 + gap, L_fail)
+    Rp0, Rp1 = seg(padT, R_pass)
+    Rf0, Rf1 = seg(Rp1 + gap, R_fail)
+
+    COL = {"rescued": "#0ca30c", "regressed": "#d03b3b", "stay_pass": "#2a78d6", "stay_fail": "#898781"}
+
+    def ribbon(sy0, sy1, ty0, ty1, color, label):
+        xm = (xL + nodeW + xR) / 2
+        d = (f"M{xL+nodeW},{sy0:.1f} C{xm},{sy0:.1f} {xm},{ty0:.1f} {xR},{ty0:.1f} "
+             f"L{xR},{ty1:.1f} C{xm},{ty1:.1f} {xm},{sy1:.1f} {xL+nodeW},{sy1:.1f} Z")
+        return f'<path d="{d}" fill="{color}" opacity="0.45"><title>{esc(label)}</title></path>'
+
+    # allocate source/target cursors within each node, ordered to minimise crossing
+    parts = [f'<svg class="chart" viewBox="0 0 {W} {H}" role="img" aria-label="Baseline to champion Pass^3 transitions">']
+    # ribbons: (transition, source-node, target-node)
+    lp_cur, lf_cur, rp_cur, rf_cur = Lp0, Lf0, Rp0, Rf0
+    order = [("stay_pass", "Lp", "Rp"), ("regressed", "Lp", "Rf"), ("rescued", "Lf", "Rp"), ("stay_fail", "Lf", "Rf")]
+    cur = {"Lp": Lp0, "Lf": Lf0, "Rp": Rp0, "Rf": Rf0}
+    labels = {"stay_pass": "stayed pass", "regressed": "regressed (pass→fail)",
+              "rescued": "rescued (fail→pass)", "stay_fail": "stayed fail"}
+    for t, snode, tnode in order:
+        h = trans[t] * scale
+        sy0 = cur[snode]; cur[snode] += h
+        ty0 = cur[tnode]; cur[tnode] += h
+        parts.append(ribbon(sy0, sy0 + h, ty0, ty0 + h, COL[t], f"{labels[t]}: {trans[t]} tasks"))
+
+    # nodes
+    def node(x, y0, y1, label, sub):
+        return (f'<rect x="{x}" y="{y0:.1f}" width="{nodeW}" height="{max(y1-y0,1):.1f}" rx="2" fill="var(--ink2)"/>'
+                f'<text x="{x-8 if x<W/2 else x+nodeW+8}" y="{(y0+y1)/2:.1f}" class="cat" '
+                f'text-anchor="{"end" if x<W/2 else "start"}" dominant-baseline="middle">{esc(label)}</text>'
+                f'<text x="{x-8 if x<W/2 else x+nodeW+8}" y="{(y0+y1)/2+14:.1f}" class="tick" '
+                f'text-anchor="{"end" if x<W/2 else "start"}" dominant-baseline="middle">{esc(sub)}</text>')
+    parts.append(node(xL, Lp0, Lp1, "pass", f"{L_pass}"))
+    parts.append(node(xL, Lf0, Lf1, "fail", f"{L_fail}"))
+    parts.append(node(xR, Rp0, Rp1, "pass", f"{R_pass}"))
+    parts.append(node(xR, Rf0, Rf1, "fail", f"{R_fail}"))
+    parts.append(f'<text x="{xL+nodeW/2}" y="16" class="tick" text-anchor="middle">baseline</text>')
+    parts.append(f'<text x="{xR+nodeW/2}" y="16" class="tick" text-anchor="middle">champion</text>')
+    parts.append("</svg>")
+
+    legend = "".join(
+        f'<span class="lg"><i class="sw" style="background:{COL[t]}"></i>{labels[t]} ({trans[t]})</span>'
+        for t in ["rescued", "regressed", "stay_pass", "stay_fail"]
+    )
+    return (
+        '<section><h2>Where the harness helps — Pass^3 transitions, baseline → champion '
+        '<span class="mono muted">full test set</span></h2>'
+        f'<div class="legend">{legend}</div>'
+        f'<figure>{"".join(parts)}'
+        f'<figcaption><b>Figure.</b> Each of the {total} test tasks by whether it passes Pass^3 under the raw '
+        f'model (left) vs. the champion harness (right). <b>{trans["rescued"]} tasks are rescued</b> '
+        f'(fail→pass) against only {trans["regressed"]} regressions — and <b>{hall_rescued} of the '
+        f'{trans["rescued"]} rescues are hallucination tasks</b>, the harness\'s design target.'
+        '</figcaption></figure></section>'
+    )
+
+
 # ------------------------------------------------------------------ page
 
 def build() -> str:
@@ -470,6 +586,8 @@ pre.report {{ max-height:420px; }}
 </table>
 </div>
 </section>
+
+{rescue_sankey(runs)}
 
 {improvement_log}
 
