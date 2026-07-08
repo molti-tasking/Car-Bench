@@ -276,6 +276,65 @@ def build() -> str:
         'edit is committed before its round, so every score is attributable to an exact code state.</p></section>'
     )
 
+    # Benchmark-validity: simulator-noise audit (optional; tool is separate)
+    simulator_section = ""
+    try:
+        from simulator_audit import audit as run_sim_audit
+        a = run_sim_audit()
+        if a["total_fail"]:
+            sims = sorted(a["by_sim"].items(), key=lambda kv: -(kv[1]["misfire"] / kv[1]["fail"] if kv[1]["fail"] else 0))
+            barW, gap, maxh = 90, 28, 150
+            bars = []
+            for i, (sim, s) in enumerate(sims):
+                rate = (s["misfire"] / s["fail"]) if s["fail"] else 0
+                h = maxh * rate
+                x = 60 + i * (barW + gap)
+                y = 20 + (maxh - h)
+                small = s["fail"] < 10
+                bars.append(
+                    f'<rect x="{x}" y="{y:.0f}" width="{barW}" height="{max(h,2):.0f}" rx="3" '
+                    f'class="{"sret" if small else "sbad"}"><title>{esc(sim)}: {s["misfire"]}/{s["fail"]} failures are misfires'
+                    f'{" (n too small)" if small else ""}</title></rect>'
+                    f'<text x="{x+barW/2}" y="{y-6:.0f}" class="val" text-anchor="middle">{rate*100:.0f}%</text>'
+                    f'<text x="{x+barW/2}" y="185" class="cat" text-anchor="middle">{esc(sim)}</text>'
+                    f'<text x="{x+barW/2}" y="199" class="tick" text-anchor="middle">n={s["fail"]} fails</text>'
+                )
+            chart = (
+                f'<svg class="chart" viewBox="0 0 {60 + len(sims)*(barW+gap)} 210" role="img" '
+                f'aria-label="Simulator misfire rate by model">'
+                + "".join(f'<line x1="60" y1="{20+maxh*(1-f):.0f}" x2="{40+len(sims)*(barW+gap)}" y2="{20+maxh*(1-f):.0f}" class="grid"/>'
+                          f'<text x="54" y="{24+maxh*(1-f):.0f}" class="tick" text-anchor="end">{int(f*100)}%</text>'
+                          for f in (0.25, 0.5, 0.75, 1.0))
+                + "".join(bars) + "</svg>"
+            )
+            frag_counts = {}
+            for _, tid, split, *_ in a["fragile"]:
+                frag_counts[tid] = frag_counts.get(tid, 0) + 1
+            frag_rows = "".join(
+                f'<tr><td class="mono">{esc(t)}</td><td class="num">{c}</td></tr>'
+                for t, c in sorted(frag_counts.items(), key=lambda kv: -kv[1])
+            )
+            simulator_section = (
+                '<section><h2>Benchmark validity — simulator noise '
+                '<span class="mono muted">tools/simulator_audit.py</span></h2>'
+                '<div class="figures"><figure>' + chart +
+                '<figcaption><b>Figure.</b> Share of an agent\'s <em>failures</em> that are simulator '
+                'misfires — the user-sim ending the conversation on turn one, before the agent acts. '
+                'Gray = sample too small to judge (the official Gemini sim is barely represented here).'
+                '</figcaption></figure>'
+                '<figure><table><thead><tr><th>chronically fragile task</th><th>configs affected</th></tr></thead>'
+                f'<tbody>{frag_rows}</tbody></table>'
+                '<figcaption><b>Table.</b> Tasks that flip pass↔misfire across independent agent '
+                'configurations — the flip is the simulator, not the agent.</figcaption></figure></div>'
+                f'<p class="footnote">{a["total_misfire"]}/{a["total_fail"]} failures '
+                f'({a["total_misfire"]/a["total_fail"]*100:.1f}%) are simulator artifacts across '
+                f'{a["total_rows"]} trial rows; {a["p3_broken_misfire_only"]} Pass^3 breaks would flip to '
+                'pass without them. Misfire rate is strongly model-dependent — a fixable validity axis, '
+                'not an agent property.</p></section>'
+            )
+    except Exception:
+        simulator_section = ""
+
     latest_report = ""
     if REPORTS_DIR.exists():
         reports = sorted(REPORTS_DIR.glob("*.md"))
@@ -345,6 +404,8 @@ figcaption b {{ color:var(--ink); }}
 td.up {{ color:var(--good); }}
 td.down {{ color:var(--bad); }}
 .footnote {{ font-size:12px; color:var(--muted); margin:10px 0 0; }}
+.chart rect.sbad {{ fill:#d03b3b; }}
+.chart rect.sret {{ fill:#898781; }}
 .legend {{ display:flex; flex-wrap:wrap; gap:14px; margin-bottom:8px; }}
 .lg {{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink2); }}
 .sw {{ width:10px; height:10px; border-radius:3px; display:inline-block; flex:none; }}
@@ -411,6 +472,8 @@ pre.report {{ max-height:420px; }}
 </section>
 
 {improvement_log}
+
+{simulator_section}
 
 <section>
 <h2>Prompt variants under test</h2>
