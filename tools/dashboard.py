@@ -314,6 +314,88 @@ def rescue_sankey(runs: list[dict]) -> str:
     )
 
 
+def _task_states(raw_path: Path) -> dict:
+    """(split, task_id) -> {'p3': all trials pass, 'pat3': any trial passes}."""
+    from collections import defaultdict
+    payload = json.loads(raw_path.read_text())
+    per = defaultdict(list)
+    for split, rows in (payload.get("final_result", {}).get("detailed_results_by_split") or {}).items():
+        for r in rows or []:
+            per[(split, r.get("task_id"))].append((r.get("reward") or 0) >= 1)
+    return {k: {"p3": len(v) >= 1 and all(v), "pat3": any(v)} for k, v in per.items()}
+
+
+def rescue_waffle(runs: list[dict]) -> str:
+    """One square per test task, grouped by category, colored by what the
+    champion harness changed vs the raw baseline. Replaces the flow diagram
+    with a concrete, countable unit chart."""
+    def latest(pred):
+        hits = [r for r in runs if pred(r) and r["split"] == "test" and r["tasks_per_category"] == -1]
+        return hits[-1] if hits else None
+
+    champ = latest(lambda r: r["variant"] == "v4_german+selfcheck")
+    base = latest(lambda r: r["variant"] == "baseline")
+    if not (champ and base):
+        return ""
+    cpath, bpath = REPO_ROOT / champ["output_path"], REPO_ROOT / base["output_path"]
+    if not (cpath.exists() and bpath.exists()):
+        return ""
+    cs, bs = _task_states(cpath), _task_states(bpath)
+    common = set(cs) & set(bs)
+    if not common:
+        return ""
+
+    from collections import defaultdict
+    cats = defaultdict(list)
+    tally = defaultdict(lambda: defaultdict(int))
+    for k in common:
+        split, tid = k
+        b, c = bs[k]["p3"], cs[k]["p3"]
+        t = "fixed" if (not b and c) else "keptpass" if (b and c) else "broke" if (b and not c) else "fail"
+        flaky = t in ("fail", "broke") and cs[k]["pat3"]  # champion solves some trials, not all
+        cats[split].append((tid, t, flaky))
+        tally[split][t] += 1
+
+    order = ["fixed", "keptpass", "fail", "broke"]
+    LABEL = {"fixed": "fixed", "keptpass": "kept pass", "fail": "still fails", "broke": "broke"}
+    CATL = {"hallucination": "Hallucination", "disambiguation": "Disambiguation", "base": "Base"}
+    blocks = []
+    for split in sorted(cats, key=lambda s: -tally[s]["fixed"]):
+        cells = sorted(cats[split], key=lambda x: order.index(x[1]))
+        cell_html = "".join(
+            f'<span class="wc wc-{t}{" flaky" if fl else ""}" title="{esc(tid)} — {LABEL[t]}'
+            f'{" · capable but inconsistent" if fl else ""}"></span>'
+            for tid, t, fl in cells
+        )
+        counts = " · ".join(f'{tally[split][t]} {LABEL[t]}' for t in order if tally[split][t])
+        blocks.append(
+            f'<div class="waffle-cat"><h4>{esc(CATL.get(split, split))} '
+            f'<span class="muted mono">{len(cells)} tasks · {counts}</span></h4>'
+            f'<div class="waffle-grid">{cell_html}</div></div>'
+        )
+
+    legend = (
+        '<span class="lg"><i class="wc wc-fixed"></i>fixed (fail→pass)</span>'
+        '<span class="lg"><i class="wc wc-keptpass"></i>kept pass</span>'
+        '<span class="lg"><i class="wc wc-fail"></i>still fails</span>'
+        '<span class="lg"><i class="wc wc-broke"></i>broke (pass→fail)</span>'
+        '<span class="lg"><i class="wc wc-fail flaky"></i>dot = capable but inconsistent</span>'
+    )
+    total_fixed = sum(tally[s]["fixed"] for s in tally)
+    total_broke = sum(tally[s]["broke"] for s in tally)
+    hall_fixed = tally.get("hallucination", {}).get("fixed", 0)
+    return (
+        '<section id="rescue-section"><h2>What the harness fixed — every test task, one square '
+        '<span class="mono muted">baseline → champion</span></h2>'
+        f'<div class="legend">{legend}</div>'
+        f'<div class="waffle">{"".join(blocks)}</div>'
+        f'<p class="footnote">Each square is one of the {len(common)} test tasks, grouped by category and '
+        f'colored by what changed. <b>{total_fixed} fixed</b> (fail→pass) vs {total_broke} broken; '
+        f'{hall_fixed} of the fixes are hallucination tasks — the harness\'s design target. A white dot marks '
+        'tasks the champion solves in some trials but not all (Pass@3 but not Pass^3).</p></section>'
+    )
+
+
 # ------------------------------------------------------------------ page
 
 def build() -> str:
@@ -522,6 +604,15 @@ td.down {{ color:var(--bad); }}
 .footnote {{ font-size:12px; color:var(--muted); margin:10px 0 0; }}
 .chart rect.sbad {{ fill:#d03b3b; }}
 .chart rect.sret {{ fill:#898781; }}
+.waffle {{ display:flex; flex-direction:column; gap:14px; margin-top:4px; }}
+.waffle-cat h4 {{ font-size:12.5px; font-weight:600; margin:0 0 6px; }}
+.waffle-grid {{ display:flex; flex-wrap:wrap; gap:3px; }}
+.wc {{ width:14px; height:14px; border-radius:2px; display:inline-block; position:relative; flex:none; }}
+.wc-fixed {{ background:#0ca30c; }}
+.wc-keptpass {{ background:#2a78d6; }}
+.wc-fail {{ background:#898781; }}
+.wc-broke {{ background:#d03b3b; }}
+.wc.flaky::after {{ content:""; position:absolute; inset:4px; border-radius:50%; background:rgba(255,255,255,.9); }}
 .legend {{ display:flex; flex-wrap:wrap; gap:14px; margin-bottom:8px; }}
 .lg {{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink2); }}
 .sw {{ width:10px; height:10px; border-radius:3px; display:inline-block; flex:none; }}
@@ -551,7 +642,7 @@ pre.report {{ max-height:420px; }}
   section, .tiles, header .sub {{ display:none; }}
   .figures {{ grid-template-columns:1fr; gap:24px; }}
   figure {{ border:none; padding:0; page-break-inside:avoid; }}
-  #arch-section {{ display:block; border:none; }}
+  #arch-section, #rescue-section {{ display:block; border:none; }}
 }}
 </style>
 <main>
@@ -587,7 +678,7 @@ pre.report {{ max-height:420px; }}
 </div>
 </section>
 
-{rescue_sankey(runs)}
+{rescue_waffle(runs)}
 
 {improvement_log}
 
