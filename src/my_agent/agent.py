@@ -102,12 +102,14 @@ class MyAgentExecutor(AgentExecutor):
         ask_gate: bool = False,
         vote_k: int = 0,
         vote_temperature: float = 0.7,
+        schema_guard: bool = False,
     ):
         self.self_check = self_check
         self.self_check_model = self_check_model
         self.ask_gate = ask_gate
         self.vote_k = vote_k
         self.vote_temperature = vote_temperature
+        self.schema_guard = schema_guard
         self.model = model
         self.temperature = temperature
         self.reasoning_effort = reasoning_effort
@@ -167,6 +169,52 @@ class MyAgentExecutor(AgentExecutor):
             turn_m[COMPLETION_TOKENS] += getattr(usage, "completion_tokens", 0) or 0
         turn_m[NUM_LLM_CALLS] += 1
         return response
+
+    @staticmethod
+    def validate_tool_calls(tool_calls: list[dict], tools: list[dict]) -> list[str]:
+        """Deterministic pre-flight of tool calls against the evaluator-provided
+        schema. Returns human-readable violations (empty = valid). Uses only the
+        schema the evaluator sent — no hidden state, benchmark-legal.
+
+        With native tool calling the model rarely invents tool *names*, so the
+        real value is argument validation: missing required args, invalid enum
+        values (a hallucinated ambient color), malformed JSON.
+        """
+        schema = {}
+        for t in tools or []:
+            fn = t.get("function", {})
+            if fn.get("name"):
+                schema[fn["name"]] = fn.get("parameters", {}) or {}
+        violations: list[str] = []
+        for tc in tool_calls or []:
+            name = tc.get("function", {}).get("name", "")
+            if name not in schema:
+                violations.append(f"Tool '{name}' is not among the available tools.")
+                continue
+            params = schema[name]
+            props = params.get("properties", {}) or {}
+            required = params.get("required", []) or []
+            try:
+                args = json.loads(tc["function"].get("arguments") or "{}")
+            except Exception:
+                violations.append(f"Tool '{name}' has malformed JSON arguments.")
+                continue
+            if not isinstance(args, dict):
+                violations.append(f"Tool '{name}' arguments are not an object.")
+                continue
+            for req in required:
+                if req not in args:
+                    violations.append(f"Tool '{name}' is missing required argument '{req}'.")
+            for arg, val in args.items():
+                spec = props.get(arg)
+                if not isinstance(spec, dict):
+                    continue
+                enum = spec.get("enum")
+                if enum is not None and val not in enum:
+                    violations.append(
+                        f"Tool '{name}' argument '{arg}'={val!r} is not one of the allowed values {enum}."
+                    )
+        return violations
 
     def _run_self_check(self, messages: list[dict], draft: str, turn_m: dict) -> str | None:
         """One verification pass before a user-facing reply is sent.
@@ -379,6 +427,45 @@ class MyAgentExecutor(AgentExecutor):
             llm_message = response.choices[0].message
             assistant_content = llm_message.model_dump(exclude_unset=True)
             tool_calls = assistant_content.get("tool_calls")
+
+            # Optional schema-guard: deterministically reject invalid tool calls
+            # (unknown tool, missing required arg, hallucinated enum value) and
+            # regenerate once with a corrective nudge, so the model fixes the
+            # call or tells the user it cannot do it — rather than emitting a
+            # fabricated action.
+            if self.schema_guard and tool_calls:
+                violations = self.validate_tool_calls(tool_calls, tools)
+                if violations:
+                    try:
+                        ctx_logger.info("Schema-guard caught invalid tool calls; regenerating",
+                                        violations=violations)
+                        nudge = (
+                            "Interner Hinweis: Der zuletzt erzeugte Werkzeugaufruf ist ungültig:\n- "
+                            + "\n- ".join(violations)
+                            + "\nVerwende ausschließlich die verfügbaren Werkzeuge mit gültigen"
+                            " Argumentwerten. Wenn die benötigte Funktion oder ein gültiger Wert"
+                            " nicht verfügbar ist, sage dem Nutzer offen, dass du das nicht tun"
+                            " kannst, statt einen ungültigen Aufruf zu erzwingen."
+                        )
+                        regen = messages + [{"role": "system", "content": nudge}]
+                        response = completion(messages=regen, **completion_kwargs)
+                        usage = getattr(response, "usage", None)
+                        if usage:
+                            turn_m[PROMPT_TOKENS] += getattr(usage, "prompt_tokens", 0) or 0
+                            turn_m[COMPLETION_TOKENS] += getattr(usage, "completion_tokens", 0) or 0
+                        turn_m[NUM_LLM_CALLS] += 1
+                        assistant_content = response.choices[0].message.model_dump(exclude_unset=True)
+                        tool_calls = assistant_content.get("tool_calls")
+                        # Fail-safe: drop any calls still invalid after regeneration
+                        if tool_calls:
+                            valid = [tc for tc in tool_calls if not self.validate_tool_calls([tc], tools)]
+                            if len(valid) != len(tool_calls):
+                                ctx_logger.warning("Schema-guard dropping still-invalid tool calls",
+                                                   dropped=len(tool_calls) - len(valid))
+                            assistant_content["tool_calls"] = valid
+                            tool_calls = valid or None
+                    except Exception as guard_err:
+                        ctx_logger.warning(f"Schema-guard regeneration failed, keeping draft: {guard_err}")
 
             # Optional ask-gate: about to ask a clarifying question without
             # ever having consulted stored preferences? One internal nudge to
