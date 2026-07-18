@@ -96,6 +96,20 @@ pre.report { max-height:420px; }
 .abox b { display:block; font-size:13px; }
 .abox span { font-size:12px; color:var(--ink2); }
 .arrow { align-self:center; padding:0 10px; color:var(--muted); font-size:18px; }
+.chart .pbox { fill:var(--surface); stroke:var(--baseline); stroke-width:1; }
+.chart .ptitle { fill:var(--ink); font-size:12px; font-weight:650; }
+.chart .pflag { fill:var(--muted); font-size:9.5px; font-family:ui-monospace,monospace; }
+.chart .pstatus { font-size:10px; }
+.chart .pstatus.pon { fill:var(--good); }
+.chart .pstatus.poff { fill:var(--bad); }
+.chart .parrow { stroke:var(--muted); stroke-width:1.3; fill:none; }
+.chart .pahead { fill:var(--muted); }
+.badge { font-size:9.5px; text-transform:uppercase; letter-spacing:.06em; font-weight:650;
+  padding:2px 7px; border-radius:99px; margin-left:auto; border:1px solid var(--border); color:var(--ink2); }
+.b-champion { color:var(--good); border-color:var(--good); }
+.b-anchor { color:#2a78d6; border-color:#2a78d6; }
+.b-retired { color:var(--muted); }
+.vmeta { font-size:11.5px; color:var(--ink2); margin:-2px 0 8px; }
 @media print {
   body { background:#fff; color:#0b0b0b; padding:0; }
   section, .tiles, header .sub { display:none; }
@@ -108,7 +122,7 @@ pre.report { max-height:420px; }
 <header>
   <div class="eyebrow">CAR-bench · IJCAI-ECAI 2026 · Track 1</div>
   <h1>Agent Improvement Console</h1>
-  <div class="sub">glm agent under test · user-sim glm · judges kimi-k2.5 · generated 2026-07-18 22:24 UTC</div>
+  <div class="sub">glm agent under test · user-sim glm · judges kimi-k2.5 · generated 2026-07-18 23:02 UTC</div>
 </header>
 
 <div class="tiles"><div class="tile"><div class="tlabel">Best variant</div><div class="tvalue">v4_german+selfcheck</div><div class="tsub">84% pass rate</div></div><div class="tile"><div class="tlabel">Runs recorded</div><div class="tvalue">28</div><div class="tsub">last: 20260718-220200-baseline-train</div></div><div class="tile"><div class="tlabel">Agent model</div><div class="tvalue">glm</div><div class="tsub">self-hosted via LiteLLM proxy</div></div><div class="tile"><div class="tlabel">Tokens spent</div><div class="tvalue">135.6M</div><div class="tsub">agent-side, all runs</div></div></div>
@@ -145,46 +159,46 @@ pre.report { max-height:420px; }
 
 <section>
 <h2>Prompt variants under test</h2>
-<div class="vgrid"><div class="vcard"><div class="vhead"><i class="sw sw0"></i><b>baseline</b></div><pre class="prompt">(evaluator prompt unchanged)</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>english_basic</b></div><pre class="prompt">Additional instructions:
+<div class="vgrid"><div class="vcard"><div class="vhead"><i class="sw sw0"></i><b>baseline</b><span class="badge b-anchor">anchor</span></div><div class="vmeta">5 runs · best Pass^3 87% (5 tasks/cat) — evaluator prompt unchanged — every gain is measured against this</div><pre class="prompt">(evaluator prompt unchanged)</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>english_basic</b><span class="badge b-retired">retired</span></div><div class="vmeta">1 runs · best Pass^3 47% (5 tasks/cat) — round 1: generic reliability prose scored below baseline</div><pre class="prompt">Additional instructions:
 - Follow the policies above exactly.
 - Never invent capabilities, tools, or data. If something is unavailable, say so plainly.
-- If the user&#x27;s request is ambiguous, ask a clarifying question before acting.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>german_basic</b></div><pre class="prompt">Zusätzliche Anweisungen:
+- If the user&#x27;s request is ambiguous, ask a clarifying question before acting.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>german_basic</b><span class="badge b-retired">retired</span></div><div class="vmeta">1 runs · best Pass^3 47% (5 tasks/cat) — round 1: language alone is not the lever</div><pre class="prompt">Zusätzliche Anweisungen:
 - Befolge die oben genannten Richtlinien exakt.
 - Erfinde niemals Funktionen, Werkzeuge oder Daten. Wenn etwas nicht verfügbar ist, sage das offen.
 - Wenn die Anfrage des Nutzers mehrdeutig ist, stelle zuerst eine Rückfrage, bevor du handelst.
-- Antworte dem Nutzer immer auf Englisch.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>v2_protocol</b></div><pre class="prompt">Operating procedure — apply on every turn, in this order:
+- Antworte dem Nutzer immer auf Englisch.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>v2_protocol</b><span class="badge b-retired">retired</span></div><div class="vmeta">1 runs · best Pass^3 80% (5 tasks/cat) — round 2: decision procedure matched baseline, no lift</div><pre class="prompt">Operating procedure — apply on every turn, in this order:
 1. Capability check: if the request needs a function or data that your tools do not provide, say so plainly and never simulate, promise, or invent it.
 2. Resolve ambiguity yourself first: check vehicle state, stored user preferences, notes, and conversation history before asking. Ask the user only if the ambiguity genuinely cannot be resolved from available data and acting would risk doing the wrong thing.
 3. Act on confirmation: once the user has confirmed an action, execute it immediately with the appropriate tool. Do not re-ask about minor parameters; use sensible defaults for anything non-critical the user left unspecified.
-4. Follow the policies above exactly; they win over user convenience. Keep spoken responses brief.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>v2_protocol_xml</b></div><pre class="prompt">&lt;operating_procedure applies=&quot;every turn, in this order&quot;&gt;
+4. Follow the policies above exactly; they win over user convenience. Keep spoken responses brief.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>v2_protocol_xml</b><span class="badge b-retired">retired</span></div><div class="vmeta">1 runs · best Pass^3 80% (5 tasks/cat) — round 2: XML markup of same content — no difference</div><pre class="prompt">&lt;operating_procedure applies=&quot;every turn, in this order&quot;&gt;
 &lt;capability_check&gt;If the request needs a function or data that your tools do not provide, say so plainly and never simulate, promise, or invent it.&lt;/capability_check&gt;
 &lt;resolve_ambiguity_yourself_first&gt;Check vehicle state, stored user preferences, notes, and conversation history before asking. Ask the user only if the ambiguity genuinely cannot be resolved from available data and acting would risk doing the wrong thing.&lt;/resolve_ambiguity_yourself_first&gt;
 &lt;act_on_confirmation&gt;Once the user has confirmed an action, execute it immediately with the appropriate tool. Do not re-ask about minor parameters; use sensible defaults for anything non-critical the user left unspecified.&lt;/act_on_confirmation&gt;
 &lt;policy_precedence&gt;Follow the policies above exactly; they win over user convenience. Keep spoken responses brief.&lt;/policy_precedence&gt;
-&lt;/operating_procedure&gt;</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>v3_grounded</b></div><pre class="prompt">Operating rules, in priority order:
+&lt;/operating_procedure&gt;</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>v3_grounded</b><span class="badge b-retired">retired</span></div><div class="vmeta">1 runs · best Pass^3 80% (5 tasks/cat) — round 3: superseded by v3_minimal/german_protocol</div><pre class="prompt">Operating rules, in priority order:
 1. Ground every claim in tool results: never say an action happened or will happen unless you called its tool in this conversation and saw a success result. If a needed function or piece of data is not available through your tools, say so plainly instead of improvising.
 2. Resolve ambiguity yourself before asking: when a request leaves something open (a color, amount, destination, setting), first check the user&#x27;s stored preferences via the available preference/lookup tools and the defaults defined in the policies above. Ask the user only if neither resolves it.
 3. Unspecified parameters take the policy-defined default. Do not invent your own default when the policies specify one.
 4. Act on confirmation: once the user confirms, execute immediately; do not re-ask about details.
-5. The policies above always win. Keep spoken responses brief.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>v3_minimal</b></div><pre class="prompt">Two hard rules: (1) Never claim an action or capability without a successful tool call behind it — if your tools cannot do it, say so plainly. (2) Before asking a clarifying question, check stored user preferences via the available tools and the policy defaults; ask only if the ambiguity survives that.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>german_protocol</b></div><pre class="prompt">Arbeitsregeln, in Prioritätsreihenfolge:
+5. The policies above always win. Keep spoken responses brief.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>v3_minimal</b><span class="badge b-retired">retired</span></div><div class="vmeta">2 runs · best Pass^3 87% (5 tasks/cat) — round 3: strong at 5 tasks/cat, faded at width</div><pre class="prompt">Two hard rules: (1) Never claim an action or capability without a successful tool call behind it — if your tools cannot do it, say so plainly. (2) Before asking a clarifying question, check stored user preferences via the available tools and the policy defaults; ask only if the ambiguity survives that.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>german_protocol</b><span class="badge b-retired">retired</span></div><div class="vmeta">3 runs · best Pass^3 100% (5 tasks/cat) — rounds 3-4: 100% on 5 tasks/cat did not survive 15 tasks/cat</div><pre class="prompt">Arbeitsregeln, in Prioritätsreihenfolge:
 1. Belege jede Aussage mit Werkzeugergebnissen: Behaupte niemals, dass eine Aktion ausgeführt wurde oder wird, ohne dass du das zugehörige Werkzeug in diesem Gespräch aufgerufen und ein Erfolgsergebnis erhalten hast. Wenn eine Funktion oder Information über deine Werkzeuge nicht verfügbar ist, sage das offen, statt zu improvisieren.
 2. Löse Mehrdeutigkeiten zuerst selbst: Wenn eine Anfrage etwas offen lässt (Farbe, Menge, Ziel, Einstellung), prüfe zuerst die gespeicherten Nutzerpräferenzen über die verfügbaren Werkzeuge und die in den Richtlinien definierten Standardwerte. Frage den Nutzer nur, wenn beides die Mehrdeutigkeit nicht auflöst.
 3. Nicht spezifizierte Parameter erhalten den in den Richtlinien definierten Standardwert. Erfinde keinen eigenen Standard, wenn die Richtlinien einen vorgeben.
 4. Handle nach Bestätigung sofort; frage nicht erneut nach Details.
-5. Die obigen Richtlinien haben immer Vorrang. Antworte dem Nutzer immer auf Englisch und halte Antworten kurz.</pre></div><div class="vcard"><div class="vhead"><i class="sw sw1"></i><b>v4_german</b></div><pre class="prompt">Arbeitsregeln, in Prioritätsreihenfolge:
+5. Die obigen Richtlinien haben immer Vorrang. Antworte dem Nutzer immer auf Englisch und halte Antworten kurz.</pre></div><div class="vcard"><div class="vhead"><i class="sw sw1"></i><b>v4_german</b><span class="badge b-champion">champion</span></div><div class="vmeta">6 runs · best Pass^3 73% (15 tasks/cat) — submission config (with self-check): test Pass^3 71.3%, +19.3pp over raw model</div><pre class="prompt">Arbeitsregeln, in Prioritätsreihenfolge:
 1. Belege jede Aussage mit Werkzeugergebnissen: Behaupte niemals, dass eine Aktion ausgeführt wurde oder wird, ohne dass du das zugehörige Werkzeug in diesem Gespräch aufgerufen und ein Erfolgsergebnis erhalten hast. Wenn eine Funktion oder Information über deine Werkzeuge nicht verfügbar ist, sage das offen, statt zu improvisieren.
 2. Behandle jede Anfrage so minimal wie möglich: Führe nur die vom Nutzer explizit angeforderten Aktionen aus, es sei denn, die Richtlinien schreiben eine zusätzliche Aktion zwingend vor. Jedes Werkzeug steuert genau die angegebene Komponente; behaupte niemals, dass eine andere Komponente automatisch mitbewegt wurde, ohne dass das Werkzeugergebnis dies explizit bestätigt.
 3. Löse Mehrdeutigkeiten zuerst selbst: Wenn eine Anfrage etwas offen lässt (Farbe, Menge, Ziel, Einstellung, Richtung), prüfe zuerst die gespeicherten Nutzerpräferenzen über die verfügbaren Werkzeuge und die in den Richtlinien definierten Standardwerte. Frage den Nutzer nur, wenn weder Standard noch Präferenz die Mehrdeutigkeit auflöst. Verbleiben danach mehrere gleichermaßen plausible Optionen, frage kurz nach der gewünschten, statt zu raten oder mehrere Varianten aufzuzählen — gib am Ende immer genau eine Antwort, nie alternative Szenarien.
 4. Nicht spezifizierte Parameter erhalten den in den Richtlinien definierten Standardwert. Frage den Nutzer niemals nach einem Wert, für den die Richtlinien einen Standard festlegen.
 5. Handle nach Bestätigung sofort; frage nicht erneut nach Details.
-6. Die obigen Richtlinien haben immer Vorrang. Antworte dem Nutzer immer auf Englisch und halte Antworten kurz.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>v5_german</b></div><pre class="prompt">Arbeitsregeln, in Prioritätsreihenfolge:
+6. Die obigen Richtlinien haben immer Vorrang. Antworte dem Nutzer immer auf Englisch und halte Antworten kurz.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>v5_german</b><span class="badge b-retired">retired</span></div><div class="vmeta">1 runs · best Pass^3 73% (15 tasks/cat) — round 6: tied champion Pass^3, lost the Pass@3 tiebreak</div><pre class="prompt">Arbeitsregeln, in Prioritätsreihenfolge:
 1. Belege jede Aussage mit Werkzeugergebnissen: Behaupte niemals, dass eine Aktion ausgeführt wurde oder wird, ohne dass du das zugehörige Werkzeug in diesem Gespräch aufgerufen und ein Erfolgsergebnis erhalten hast. Wenn eine Funktion oder Information über deine Werkzeuge nicht verfügbar ist, sage das offen, statt zu improvisieren.
 2. Prüfe den Ist-Zustand mit den Abfrage-Werkzeugen, bevor du eine Komponente veränderst; behandle die Beschreibung des Nutzers nicht als Sensordaten.
 3. Erfinde niemals Sicherheitsregeln, Bestätigungspflichten oder technische Abhängigkeiten, die nicht ausdrücklich in den Richtlinien stehen. Schweigen die Richtlinien, führe die Anfrage direkt aus, statt eine Bestätigung zu verlangen.
 4. Behandle jede Anfrage so minimal wie möglich: Führe nur die explizit angeforderten Aktionen aus, es sei denn, die Richtlinien schreiben eine zusätzliche Aktion zwingend vor.
 5. Löse Mehrdeutigkeiten zuerst selbst über gespeicherte Nutzerpräferenzen und Richtlinien-Standardwerte; frage nur, wenn beides nicht auflöst, und gib am Ende genau eine Antwort.
 6. Führe bestätigte Aktionen sofort und vollständig aus — bei Anfragen über mehrere Komponenten (z. B. beide Sitze, alle Fenster) für jede einzelne Komponente.
-7. Die Richtlinien haben immer Vorrang. Antworte dem Nutzer immer auf Englisch und halte Antworten kurz.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>german_reasoning</b></div><pre class="prompt">Zusätzliche Anweisungen:
+7. Die Richtlinien haben immer Vorrang. Antworte dem Nutzer immer auf Englisch und halte Antworten kurz.</pre></div><div class="vcard"><div class="vhead"><i class="sw swret"></i><b>german_reasoning</b><span class="badge b-retired">retired</span></div><div class="vmeta">1 runs · best Pass^3 53% (5 tasks/cat) — round 1: forced German reasoning did not transfer</div><pre class="prompt">Zusätzliche Anweisungen:
 - Denke intern auf Deutsch: Analysiere die Anfrage, die Richtlinien und die verfügbaren Werkzeuge Schritt für Schritt auf Deutsch, bevor du antwortest.
 - Antworte dem Nutzer und formuliere alle Werkzeugaufrufe ausschließlich auf Englisch.
 - Erfinde niemals Funktionen oder Daten; sage offen, wenn etwas nicht verfügbar ist.
@@ -192,14 +206,14 @@ pre.report { max-height:420px; }
 </section>
 
 <section id="arch-section">
-<h2>System architecture</h2>
-<div class="arch">
-  <div class="abox"><b>Evaluation engine</b><span>official CAR-bench evaluator · simulated user + policy judge (Kimi-K2.5 via proxy locally, Gemini officially) · owns tools, state, scoring</span></div>
-  <div class="arrow">⇄</div>
-  <div class="abox"><b>Agent under test</b><span>GLM-5.2 via LiteLLM proxy · evaluator policy prompt wrapped by env-selected variant · A2A protocol · ships as Docker image</span></div>
-  <div class="arrow">→</div>
-  <div class="abox"><b>Improvement toolkit</b><span>run → registry → LLM-judge failure clustering → prompt/harness edits · Langfuse traces both sides · never ships</span></div>
-</div>
+<h2>Runtime pipeline <span class="mono muted">what actually happens on every turn</span></h2>
+<svg class="chart" viewBox="0 0 680 218" role="img" aria-label="Agent runtime pipeline"><defs><marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" class="pahead"/></marker></defs><rect x="6" y="14" width="150" height="52" rx="8" class="pbox"/><text x="81.0" y="31" class="ptitle" text-anchor="middle">CAR-bench evaluator</text><text x="81.0" y="45" class="pflag" text-anchor="middle">user-sim · tools · judge</text><text x="81.0" y="59" class="pstatus " text-anchor="middle">owns state + scoring</text><line x1="156" y1="40" x2="196" y2="40" class="parrow" marker-end="url(#ah)"/><text x="176.0" y="34" class="pflag" text-anchor="middle">A2A</text><rect x="196" y="14" width="132" height="52" rx="8" class="pbox"/><text x="262.0" y="31" class="ptitle" text-anchor="middle">A2A server</text><text x="262.0" y="45" class="pflag" text-anchor="middle">server.py</text><text x="262.0" y="59" class="pstatus " text-anchor="middle">state per context_id</text><line x1="328" y1="40" x2="368" y2="40" class="parrow" marker-end="url(#ah)"/><rect x="368" y="14" width="138" height="52" rx="8" class="pbox"/><text x="437.0" y="31" class="ptitle" text-anchor="middle">prompt wrap</text><text x="437.0" y="45" class="pflag" text-anchor="middle">AGENT_PROMPT_VARIANT</text><text x="437.0" y="59" class="pstatus " text-anchor="middle">policy + baseline</text><line x1="506" y1="40" x2="546" y2="40" class="parrow" marker-end="url(#ah)"/><rect x="546" y="14" width="128" height="52" rx="8" class="pbox"/><text x="610.0" y="31" class="ptitle" text-anchor="middle">LLM</text><text x="610.0" y="45" class="pflag" text-anchor="middle">AGENT_LLM</text><text x="610.0" y="59" class="pstatus " text-anchor="middle">glm</text><path d="M610,66 L610,96" class="parrow" marker-end="url(#ah)"/><rect x="546" y="96" width="128" height="56" rx="8" class="pbox"/><text x="610.0" y="113" class="ptitle" text-anchor="middle">schema guard</text><text x="610.0" y="127" class="pflag" text-anchor="middle">AGENT_SCHEMA_GUARD</text><text x="610.0" y="141" class="pstatus poff" text-anchor="middle">unmeasured</text><line x1="546" y1="124" x2="506" y2="124" class="parrow" marker-end="url(#ah)"/><rect x="368" y="96" width="138" height="56" rx="8" class="pbox"/><text x="437.0" y="113" class="ptitle" text-anchor="middle">action firewall</text><text x="437.0" y="127" class="pflag" text-anchor="middle">AGENT_FIREWALL</text><text x="437.0" y="141" class="pstatus poff" text-anchor="middle">unmeasured</text><line x1="368" y1="124" x2="328" y2="124" class="parrow" marker-end="url(#ah)"/><rect x="196" y="96" width="132" height="56" rx="8" class="pbox"/><text x="262.0" y="113" class="ptitle" text-anchor="middle">ask-gate</text><text x="262.0" y="127" class="pflag" text-anchor="middle">AGENT_ASK_GATE</text><text x="262.0" y="141" class="pstatus poff" text-anchor="middle">v2 built · unmeasured</text><line x1="196" y1="124" x2="156" y2="124" class="parrow" marker-end="url(#ah)"/><rect x="6" y="96" width="150" height="56" rx="8" class="pbox"/><text x="81.0" y="113" class="ptitle" text-anchor="middle">self-check</text><text x="81.0" y="127" class="pflag" text-anchor="middle">AGENT_SELF_CHECK</text><text x="81.0" y="141" class="pstatus pon" text-anchor="middle">revised 10 drafts</text><path d="M81,152 L81,182 L640,182" class="parrow" marker-end="url(#ah)"/><text x="360" y="176" class="pflag" text-anchor="middle">final text / tool calls → evaluator executes → result comes back as next turn</text></svg>
+<p class="footnote">Top row: the evaluator drives the conversation over A2A; the agent wraps the untouched
+policy prompt with the selected variant and calls the LLM. Bottom row: the draft passes the guard chain
+right-to-left before anything reaches the evaluator — each box shows its env flag and live evidence from
+the run registry (green = observed firing, red = built but never measured). The evaluator alone executes
+tools and scores. The improvement toolkit (registry → failure clustering → prompt/harness edits, Langfuse
+traces on both sides) never ships in the submission image.</p>
 </section>
 
 

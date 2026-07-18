@@ -398,6 +398,96 @@ def rescue_waffle(runs: list[dict]) -> str:
 
 # ------------------------------------------------------------------ page
 
+# Curated campaign verdicts per prompt variant; measured numbers are joined
+# from the registry at build time. A card without an entry renders as "active".
+VARIANT_STATUS = {
+    "baseline": ("anchor", "evaluator prompt unchanged — every gain is measured against this"),
+    "english_basic": ("retired", "round 1: generic reliability prose scored below baseline"),
+    "german_basic": ("retired", "round 1: language alone is not the lever"),
+    "german_reasoning": ("retired", "round 1: forced German reasoning did not transfer"),
+    "v2_protocol": ("retired", "round 2: decision procedure matched baseline, no lift"),
+    "v2_protocol_xml": ("retired", "round 2: XML markup of same content — no difference"),
+    "v3_grounded": ("retired", "round 3: superseded by v3_minimal/german_protocol"),
+    "v3_minimal": ("retired", "round 3: strong at 5 tasks/cat, faded at width"),
+    "german_protocol": ("retired", "rounds 3-4: 100% on 5 tasks/cat did not survive 15 tasks/cat"),
+    "v4_german": ("champion", "submission config (with self-check): test Pass^3 71.3%, +19.3pp over raw model"),
+    "v5_german": ("retired", "round 6: tied champion Pass^3, lost the Pass@3 tiebreak"),
+}
+
+
+def runtime_pipeline(runs: list[dict]) -> str:
+    """SVG of the actual per-turn runtime: message flow through the guard chain.
+
+    Each guard box carries its env flag and live evidence — the most recent
+    guard-event count from the registry, or 'unmeasured' if no run ever
+    recorded that mechanism firing. Order matches agent.py's response path.
+    """
+    def latest_events(pred):
+        for r in reversed(runs):
+            ge = r.get("guard_events") or {}
+            n = pred(ge)
+            if n:
+                return n, r["run_id"]
+        return 0, None
+
+    sc_n, sc_run = latest_events(lambda g: (g.get("by_mechanism") or {}).get("self_check_revised", 0))
+    ag_n, _ = latest_events(lambda g: sum(v for k, v in (g.get("by_mechanism") or {}).items() if k.startswith("ask_gate")))
+    sg_n, _ = latest_events(lambda g: (g.get("by_mechanism") or {}).get("schema_guard", 0))
+    fw_n, _ = latest_events(lambda g: sum((g.get("firewall_by_kind") or {}).values()))
+
+    model = (runs[-1]["model"].split("/")[-1]) if runs else "?"
+    variant = next((r["variant"].split("+")[0] for r in reversed(runs)), "?")
+
+    def box(x, y, w, h, title, flag, status, status_cls):
+        return (
+            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="8" class="pbox"/>'
+            f'<text x="{x+w/2}" y="{y+17}" class="ptitle" text-anchor="middle">{esc(title)}</text>'
+            + (f'<text x="{x+w/2}" y="{y+31}" class="pflag" text-anchor="middle">{esc(flag)}</text>' if flag else "")
+            + (f'<text x="{x+w/2}" y="{y+45}" class="pstatus {status_cls}" text-anchor="middle">{esc(status)}</text>' if status else "")
+        )
+
+    def arrow(x1, y1, x2, y2, label=""):
+        mid = (
+            f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" class="parrow" marker-end="url(#ah)"/>'
+        )
+        if label:
+            mid += f'<text x="{(x1+x2)/2}" y="{min(y1,y2)-6}" class="pflag" text-anchor="middle">{esc(label)}</text>'
+        return mid
+
+    guard = lambda n, run_hint: (f"fired {n}× (latest run)", "pon") if n else ("unmeasured", "poff")
+    sc_s, sc_c = (f"revised {sc_n} drafts", "pon") if sc_n else ("unmeasured", "poff")
+    ag_s, ag_c = (f"fired {ag_n}×", "pon") if ag_n else ("v2 built · unmeasured", "poff")
+    sg_s, sg_c = (f"fired {sg_n}×", "pon") if sg_n else ("unmeasured", "poff")
+    fw_s, fw_c = (f"fired {fw_n}×", "pon") if fw_n else ("unmeasured", "poff")
+
+    parts = [
+        '<svg class="chart" viewBox="0 0 680 218" role="img" aria-label="Agent runtime pipeline">',
+        '<defs><marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">'
+        '<path d="M0,0 L8,4 L0,8 z" class="pahead"/></marker></defs>',
+        # request path (top row)
+        box(6, 14, 150, 52, "CAR-bench evaluator", "user-sim · tools · judge", "owns state + scoring", ""),
+        arrow(156, 40, 196, 40, "A2A"),
+        box(196, 14, 132, 52, "A2A server", "server.py", "state per context_id", ""),
+        arrow(328, 40, 368, 40),
+        box(368, 14, 138, 52, "prompt wrap", "AGENT_PROMPT_VARIANT", f"policy + {variant}", ""),
+        arrow(506, 40, 546, 40),
+        box(546, 14, 128, 52, "LLM", "AGENT_LLM", model, ""),
+        # elbow down from LLM into the guard chain (bottom row, right to left)
+        '<path d="M610,66 L610,96" class="parrow" marker-end="url(#ah)"/>',
+        box(546, 96, 128, 56, "schema guard", "AGENT_SCHEMA_GUARD", sg_s, sg_c),
+        arrow(546, 124, 506, 124),
+        box(368, 96, 138, 56, "action firewall", "AGENT_FIREWALL", fw_s, fw_c),
+        arrow(368, 124, 328, 124),
+        box(196, 96, 132, 56, "ask-gate", "AGENT_ASK_GATE", ag_s, ag_c),
+        arrow(196, 124, 156, 124),
+        box(6, 96, 150, 56, "self-check", "AGENT_SELF_CHECK", sc_s, sc_c),
+        '<path d="M81,152 L81,182 L640,182" class="parrow" marker-end="url(#ah)"/>',
+        '<text x="360" y="176" class="pflag" text-anchor="middle">final text / tool calls → evaluator executes → result comes back as next turn</text>',
+        "</svg>",
+    ]
+    return "".join(parts)
+
+
 def build() -> str:
     runs = load_runs()
     slots = variant_slots(runs)
@@ -448,9 +538,23 @@ def build() -> str:
         for r in reversed(runs)
     )
 
+    def variant_stats(base: str) -> str:
+        rs = [r for r in runs
+              if (r["variant"] == base or r["variant"].startswith(base + "+"))
+              and r["tasks_per_category"] not in (0, 1)]
+        if not rs:
+            return "no measured runs"
+        best = max(rs, key=lambda r: max_passk(r.get("pass_power_k")) or 0)
+        width = "full test" if best["tasks_per_category"] == -1 else f'{best["tasks_per_category"]} tasks/cat'
+        return f'{len(rs)} runs · best Pass^3 {(max_passk(best.get("pass_power_k")) or 0)*100:.0f}% ({width})'
+
     variant_cards = "".join(
-        f'<div class="vcard"><div class="vhead"><i class="sw {slot_cls(slots, v, 'sw')}"></i><b>{esc(v)}</b></div>'
-        f'<pre class="prompt">{esc((spec["prefix"] + spec["suffix"]).strip() or "(evaluator prompt unchanged)")}</pre></div>'
+        (lambda status, verdict:
+            f'<div class="vcard"><div class="vhead"><i class="sw {slot_cls(slots, v, 'sw')}"></i><b>{esc(v)}</b>'
+            f'<span class="badge b-{status}">{status}</span></div>'
+            f'<div class="vmeta">{esc(variant_stats(v))} — {esc(verdict)}</div>'
+            f'<pre class="prompt">{esc((spec["prefix"] + spec["suffix"]).strip() or "(evaluator prompt unchanged)")}</pre></div>'
+        )(*VARIANT_STATUS.get(v, ("active", "in evaluation")))
         for v, spec in PROMPT_VARIANTS.items()
     )
 
@@ -659,6 +763,20 @@ pre.report {{ max-height:420px; }}
 .abox b {{ display:block; font-size:13px; }}
 .abox span {{ font-size:12px; color:var(--ink2); }}
 .arrow {{ align-self:center; padding:0 10px; color:var(--muted); font-size:18px; }}
+.chart .pbox {{ fill:var(--surface); stroke:var(--baseline); stroke-width:1; }}
+.chart .ptitle {{ fill:var(--ink); font-size:12px; font-weight:650; }}
+.chart .pflag {{ fill:var(--muted); font-size:9.5px; font-family:ui-monospace,monospace; }}
+.chart .pstatus {{ font-size:10px; }}
+.chart .pstatus.pon {{ fill:var(--good); }}
+.chart .pstatus.poff {{ fill:var(--bad); }}
+.chart .parrow {{ stroke:var(--muted); stroke-width:1.3; fill:none; }}
+.chart .pahead {{ fill:var(--muted); }}
+.badge {{ font-size:9.5px; text-transform:uppercase; letter-spacing:.06em; font-weight:650;
+  padding:2px 7px; border-radius:99px; margin-left:auto; border:1px solid var(--border); color:var(--ink2); }}
+.b-champion {{ color:var(--good); border-color:var(--good); }}
+.b-anchor {{ color:#2a78d6; border-color:#2a78d6; }}
+.b-retired {{ color:var(--muted); }}
+.vmeta {{ font-size:11.5px; color:var(--ink2); margin:-2px 0 8px; }}
 @media print {{
   body {{ background:#fff; color:#0b0b0b; padding:0; }}
   section, .tiles, header .sub {{ display:none; }}
@@ -712,14 +830,14 @@ pre.report {{ max-height:420px; }}
 </section>
 
 <section id="arch-section">
-<h2>System architecture</h2>
-<div class="arch">
-  <div class="abox"><b>Evaluation engine</b><span>official CAR-bench evaluator · simulated user + policy judge (Kimi-K2.5 via proxy locally, Gemini officially) · owns tools, state, scoring</span></div>
-  <div class="arrow">⇄</div>
-  <div class="abox"><b>Agent under test</b><span>GLM-5.2 via LiteLLM proxy · evaluator policy prompt wrapped by env-selected variant · A2A protocol · ships as Docker image</span></div>
-  <div class="arrow">→</div>
-  <div class="abox"><b>Improvement toolkit</b><span>run → registry → LLM-judge failure clustering → prompt/harness edits · Langfuse traces both sides · never ships</span></div>
-</div>
+<h2>Runtime pipeline <span class="mono muted">what actually happens on every turn</span></h2>
+{runtime_pipeline(runs)}
+<p class="footnote">Top row: the evaluator drives the conversation over A2A; the agent wraps the untouched
+policy prompt with the selected variant and calls the LLM. Bottom row: the draft passes the guard chain
+right-to-left before anything reaches the evaluator — each box shows its env flag and live evidence from
+the run registry (green = observed firing, red = built but never measured). The evaluator alone executes
+tools and scores. The improvement toolkit (registry → failure clustering → prompt/harness edits, Langfuse
+traces on both sides) never ships in the submission image.</p>
 </section>
 
 {latest_report}

@@ -195,6 +195,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write     # the registry is committed back, not just archived
+      actions: read       # pulls prior runs' raw artifacts for the rescue waffle
     steps:
       - uses: actions/checkout@v4
         with:
@@ -270,6 +271,24 @@ jobs:
           echo "::error::could not push the registry after 3 attempts. Results are still \
           in the artifacts; check branch protection on ${BRANCH}."
           exit 1
+
+      - name: Fetch prior raw payloads for cross-run sections
+        # The rescue waffle and simulator audit need per-task trajectories
+        # from *previous* runs' artifacts (raw payloads are gitignored).
+        # Best effort: a miss just drops those sections, never fails the build.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          mkdir -p experiments/raw
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.name | startswith("results-")) | select(.expired | not) | .id' \
+            | head -30 | while read -r aid; do
+              gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${aid}/zip" > /tmp/a.zip 2>/dev/null \
+                && unzip -o -q /tmp/a.zip 'raw/*' -d /tmp/adir 2>/dev/null || true
+            done
+          cp /tmp/adir/raw/*.json experiments/raw/ 2>/dev/null || true
+          ls experiments/raw/ | head -20 || true
 
       - name: Build the improvement console
         env:
