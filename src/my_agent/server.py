@@ -128,7 +128,10 @@ def resolve_config() -> dict:
         "reasoning_effort": reasoning_effort,
         "self_check": os.getenv("AGENT_SELF_CHECK", "false").lower() == "true",
         "self_check_model": os.getenv("AGENT_SELF_CHECK_MODEL") or None,
-        "ask_gate": os.getenv("AGENT_ASK_GATE", "false").lower() == "true",
+        # "true"/"v1" = original nudge-on-any-question; "v2" = fires only on
+        # genuine clarification questions (confirmation questions pass through)
+        "ask_gate": os.getenv("AGENT_ASK_GATE", "false").lower() in ("true", "v1"),
+        "ask_gate_v2": os.getenv("AGENT_ASK_GATE", "false").lower() == "v2",
         "vote_k": int(os.getenv("AGENT_VOTE_K", "0") or 0),
         "vote_temperature": float(os.getenv("AGENT_VOTE_TEMPERATURE", "0.7")),
         "schema_guard": os.getenv("AGENT_SCHEMA_GUARD", "false").lower() == "true",
@@ -184,6 +187,7 @@ def main():
             self_check=config["self_check"],
             self_check_model=config["self_check_model"],
             ask_gate=config["ask_gate"],
+            ask_gate_v2=config["ask_gate_v2"],
             vote_k=config["vote_k"],
             vote_temperature=config["vote_temperature"],
             schema_guard=config["schema_guard"],

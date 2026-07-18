@@ -227,6 +227,7 @@ def cmd_run(args: argparse.Namespace) -> None:
 
     variant_label = (args.variant + ("+selfcheck" if args.self_check else "")
                      + ("+askgate" if args.ask_gate else "")
+                     + ("+askgate2" if args.ask_gate_v2 else "")
                      + (f"+vote{args.vote}" if args.vote else "")
                      + ("+guard" if args.schema_guard else "")
                      + ("+firewall" if args.firewall else "")
@@ -295,8 +296,12 @@ def cmd_run(args: argparse.Namespace) -> None:
         env["AGENT_LLM"] = args.model
     if args.self_check:
         env["AGENT_SELF_CHECK"] = "true"
+    if args.ask_gate and args.ask_gate_v2:
+        sys.exit("--ask-gate and --ask-gate-v2 are mutually exclusive")
     if args.ask_gate:
         env["AGENT_ASK_GATE"] = "true"
+    if args.ask_gate_v2:
+        env["AGENT_ASK_GATE"] = "v2"
     if args.vote:
         env["AGENT_VOTE_K"] = str(args.vote)
     if args.schema_guard:
@@ -596,6 +601,7 @@ def main() -> None:
     p_run.add_argument("--model", default=None, help="Override AGENT_LLM for this run")
     p_run.add_argument("--self-check", action="store_true", help="Enable the agent's pre-send self-check pass")
     p_run.add_argument("--ask-gate", action="store_true", help="Enable the preference-lookup nudge before clarifying questions")
+    p_run.add_argument("--ask-gate-v2", action="store_true", help="Ask-gate v2: fires only on genuine clarification questions, never confirmations")
     p_run.add_argument("--vote", type=int, default=0, help="Self-consistency voting: K samples per turn (0 = off)")
     p_run.add_argument("--schema-guard", action="store_true", help="Deterministic tool-call schema validation + corrective regen")
     p_run.add_argument("--firewall", action="store_true", help="Deterministic action firewall (ledger + provenance + compiled policy constraints)")

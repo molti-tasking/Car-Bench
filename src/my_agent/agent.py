@@ -11,6 +11,7 @@ A cleaned-up version of the Track 1 starter:
 """
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -75,6 +76,19 @@ ASK_GATE_NUDGE = (
     " Nur wenn beides die Mehrdeutigkeit nicht auflöst, stelle die Rückfrage."
 )
 
+# v2 trigger: only genuine clarification questions (asking the user to supply
+# a missing value/choice) gate. Confirmation questions proposing a specific
+# action ("Should I set it to 21°C?") carry no clarify interrogative and pass
+# through — v1 firing on those derailed straightforward base flows.
+_CLARIFY_QUESTION_RE = re.compile(
+    r"\b(which|what|where|whose|how (?:many|much|warm|cool|hot|cold|high|low|far|long))\b",
+    re.IGNORECASE,
+)
+
+
+def _is_clarification_question(text: str) -> bool:
+    return "?" in text and bool(_CLARIFY_QUESTION_RE.search(text))
+
 
 SELF_CHECK_PROMPT = """Du prüfst den Antwortentwurf eines Auto-Sprachassistenten \
 vor dem Absenden. Melde NUR diese zwei Fehler:
@@ -105,6 +119,7 @@ class MyAgentExecutor(AgentExecutor):
         self_check: bool = False,
         self_check_model: str | None = None,
         ask_gate: bool = False,
+        ask_gate_v2: bool = False,
         vote_k: int = 0,
         vote_temperature: float = 0.7,
         schema_guard: bool = False,
@@ -117,6 +132,7 @@ class MyAgentExecutor(AgentExecutor):
         self.self_check = self_check
         self.self_check_model = self_check_model
         self.ask_gate = ask_gate
+        self.ask_gate_v2 = ask_gate_v2
         self.vote_k = vote_k
         self.vote_temperature = vote_temperature
         self.schema_guard = schema_guard
@@ -530,11 +546,16 @@ class MyAgentExecutor(AgentExecutor):
 
             # Optional ask-gate: about to ask a clarifying question without
             # ever having consulted stored preferences? One internal nudge to
-            # look up first, then the regenerated decision stands.
+            # look up first, then the regenerated decision stands. v2 narrows
+            # the trigger to genuine clarification questions so confirmation
+            # questions ("Should I ...?") pass through untouched.
+            gate_mode = "v2" if self.ask_gate_v2 else ("v1" if self.ask_gate else None)
+            draft_text = assistant_content.get("content") or ""
             if (
-                self.ask_gate
+                gate_mode
                 and not tool_calls
-                and "?" in (assistant_content.get("content") or "")
+                and "?" in draft_text
+                and (gate_mode == "v1" or _is_clarification_question(draft_text))
                 and any(t.get("function", {}).get("name") == "get_user_preferences" for t in (tools or []))
                 and not any(
                     tc["function"]["name"] == "get_user_preferences"
@@ -543,8 +564,8 @@ class MyAgentExecutor(AgentExecutor):
                 )
             ):
                 try:
-                    ctx_logger.info("Ask-gate: regenerating with preference-lookup nudge")
-                    guard_events.emit("ask_gate", context.context_id)
+                    ctx_logger.info("Ask-gate (%s): regenerating with preference-lookup nudge", gate_mode)
+                    guard_events.emit("ask_gate" if gate_mode == "v1" else "ask_gate_v2", context.context_id)
                     nudged = messages + [{"role": "system", "content": ASK_GATE_NUDGE}]
                     response = completion(messages=nudged, **completion_kwargs)
                     usage = getattr(response, "usage", None)
