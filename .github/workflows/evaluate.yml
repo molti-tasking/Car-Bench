@@ -45,8 +45,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: car-bench-eval
@@ -130,12 +128,8 @@ jobs:
     needs: evaluate
     if: always()
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
 
       - uses: actions/download-artifact@v4
         with:
@@ -169,14 +163,23 @@ jobs:
 
       - name: Build the improvement console
         run: |
-          uv sync --extra track-1-agent
-          uv run python tools/dashboard.py
+          set -euo pipefail
+          # Deliberately NOT `uv sync`: the lockfile declares car-bench as a
+          # path source (third_party/car-bench), which is gitignored and only
+          # materialises after scripts/setup_car_bench.sh. uv validates that
+          # source regardless of which --extra is selected, so a sync here
+          # fails even though the dashboard never touches the benchmark. Its
+          # only third-party import is python-dotenv.
+          python3 -m pip install --quiet python-dotenv
+          python3 tools/dashboard.py
           mkdir -p site
           cp experiments/dashboard.html site/index.html
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      # GitHub Pages needs a public repo (or a paid plan), so the console ships
+      # as a downloadable artifact instead. Actions → run → Artifacts →
+      # "improvement-console" → unzip → open index.html.
+      - uses: actions/upload-artifact@v4
         with:
-          path: site
-      - id: deploy
-        uses: actions/deploy-pages@v4
+          name: improvement-console
+          path: site/
+          retention-days: 30
