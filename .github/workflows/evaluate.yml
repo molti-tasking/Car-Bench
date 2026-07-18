@@ -159,6 +159,11 @@ jobs:
       contents: write     # the registry is committed back, not just archived
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the improvement console labels each code state with
+          # its commit subject via `git log`; a shallow clone renders every
+          # entry as "uncommitted edits".
+          fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:
@@ -229,6 +234,11 @@ jobs:
           exit 1
 
       - name: Build the improvement console
+        env:
+          # Header metadata only — must mirror the evaluate job's fixture
+          # models, or the console renders "user-sim gemini-2.5-flash · judges ?".
+          USER_SIM_MODEL: litellm_proxy/natai/glm
+          JUDGE_MODEL: litellm_proxy/natai/kimi-k2.5
         run: |
           set -euo pipefail
           # Deliberately NOT `uv sync`: the lockfile declares car-bench as a

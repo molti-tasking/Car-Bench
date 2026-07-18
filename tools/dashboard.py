@@ -419,12 +419,30 @@ def build() -> str:
         for v in dict.fromkeys([r["variant"] for r in comparable])
     )
 
+    def guards_cell(r: dict) -> str:
+        """Guard firings: total, with the per-mechanism breakdown as tooltip.
+
+        Distinguishes 'never fired' (0) from 'not instrumented' (—): a guard
+        that never fires and one that fires uselessly both leave Pass^3 flat.
+        """
+        ge = r.get("guard_events")
+        if not ge:
+            return '<td class="num muted">—</td>'
+        parts = [f"{k}: {v}" for k, v in (ge.get("by_mechanism") or {}).items()]
+        parts += [f"firewall/{k}: {v}" for k, v in (ge.get("firewall_by_kind") or {}).items()]
+        detail = ", ".join(parts) or "no firings"
+        ctx = ge.get("contexts_touched")
+        if ctx:
+            detail += f" · {ctx} contexts"
+        return f'<td class="num" title="{esc(detail)}">{ge.get("total", 0)}</td>'
+
     table_rows = "".join(
         f'<tr><td class="mono">{esc(r["run_id"])}</td><td><i class="sw {slot_cls(slots, r["variant"], 'sw')}"></i> {esc(r["variant"])}</td>'
         f'<td class="mono">{esc(r["model"].split("/")[-1])}</td><td>{esc(r["split"])}</td>'
         f'<td class="num">{r["tasks_per_category"]}</td><td class="num">{r["num_trials"]}</td>'
         f'<td class="num">{(r["pass_rate"] or 0):.1f}%</td>'
         f'<td class="num">{(max_passk(r.get("pass_power_k")) or 0)*100:.0f}%</td>'
+        f'{guards_cell(r)}'
         f'<td class="num">{(r.get("total_tokens") or 0)//1000}k</td>'
         f'<td class="mono">{esc(r.get("git_sha",""))}{"*" if r.get("git_dirty") else ""}</td></tr>'
         for r in reversed(runs)
@@ -441,7 +459,10 @@ def build() -> str:
     log_rows = []
     seen_states: list[tuple] = []
     state_runs: dict[tuple, list[dict]] = {}
-    for r in runs:
+    # Smoke runs (0/1 tasks per category) are connectivity checks, not
+    # measurements: one 1-task run swings "best pass" by ±50pp and buries the
+    # real deltas. Same filter the trajectory chart and best-variant tile use.
+    for r in [r for r in runs if r["tasks_per_category"] not in (0, 1)]:
         state = (r.get("git_sha"), bool(r.get("git_dirty")))
         if state not in state_runs:
             seen_states.append(state)
@@ -471,7 +492,8 @@ def build() -> str:
         '<th>best pass</th><th>Δ best</th></tr></thead>'
         f'<tbody>{"".join(log_rows)}</tbody></table></div>'
         '<p class="footnote">* = working tree had uncommitted changes during the run. Each prompt/harness '
-        'edit is committed before its round, so every score is attributable to an exact code state.</p></section>'
+        'edit is committed before its round, so every score is attributable to an exact code state. '
+        'Smoke runs (0/1 tasks per category) are excluded.</p></section>'
     )
 
     # Benchmark-validity: simulator-noise audit (optional; tool is separate)
@@ -659,7 +681,7 @@ pre.report {{ max-height:420px; }}
 <figure>
   {bars_by_category(comparable, slots)}
   <figcaption><b>Figure 1.</b> Pass rate by task category per prompt variant — latest comparable run each
-  (train split). Hallucination and disambiguation are the reliability categories the harness targets.</figcaption>
+  ({esc("/".join(sorted({r["split"] for r in comparable})) if comparable else "no")} split). Hallucination and disambiguation are the reliability categories the harness targets.</figcaption>
 </figure>
 <figure>
   {trajectory(runs, slots)}
@@ -672,7 +694,7 @@ pre.report {{ max-height:420px; }}
 <h2>Run registry <span class="mono muted">experiments/runs.jsonl</span></h2>
 <div class="tablewrap">
 <table>
-<thead><tr><th>run</th><th>variant</th><th>model</th><th>split</th><th>tasks/cat</th><th>trials</th><th>pass rate</th><th>Pass^k</th><th>tokens</th><th>git</th></tr></thead>
+<thead><tr><th>run</th><th>variant</th><th>model</th><th>split</th><th>tasks/cat</th><th>trials</th><th>pass rate</th><th>Pass^k</th><th title="guard firings (self-check revisions, firewall checks); — = not instrumented">guards</th><th>tokens</th><th>git</th></tr></thead>
 <tbody>{table_rows}</tbody>
 </table>
 </div>
