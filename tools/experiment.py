@@ -29,10 +29,12 @@ RUNS_FILE = EXPERIMENTS_DIR / "runs.jsonl"
 RAW_DIR = EXPERIMENTS_DIR / "raw"
 REPORTS_DIR = EXPERIMENTS_DIR / "reports"
 SCENARIOS_DIR = EXPERIMENTS_DIR / "scenarios"
+EVENTS_DIR = EXPERIMENTS_DIR / "guard_events"
 
 sys.path.insert(0, str(REPO_ROOT / "src" / "my_agent"))
 from prompts import PROMPT_VARIANTS  # noqa: E402
 from observability import normalize_litellm_proxy_env  # noqa: E402
+import guard_events  # noqa: E402
 sys.path.pop(0)
 
 MAX_JUDGED_FAILURES = 20
@@ -65,6 +67,77 @@ def _append_run(record: dict) -> None:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+TASK_SPLITS = REPO_ROOT / "third_party" / "car-bench" / "docs" / "reference_data" / "tasks" / "task_splits.json"
+CATEGORIES = ("base", "hallucination", "disambiguation")
+
+
+def load_task_ids(split: str, per_category: int) -> dict:
+    """{category: [task_id, ...]} for a split, truncated to per_category.
+
+    Sharding needs explicit task ids because the evaluator selects a shard via
+    tasks_<cat>_task_id_filter (honoured in car-bench run.py), not an offset.
+    """
+    data = json.loads(TASK_SPLITS.read_text())
+    out = {}
+    for cat in CATEGORIES:
+        ids = data.get(f"{cat}_{split}", [])
+        out[cat] = ids if per_category in (-1, None) else ids[:per_category]
+    return out
+
+
+def _merge_shards(raw_paths: list[Path]) -> dict:
+    """Recompute Pass^k across shards.
+
+    Pass^k cannot be averaged across shards — it is the fraction of *tasks*
+    whose every trial passed, so the per-task trial lists must be pooled first
+    and the metric recomputed on the union.
+    """
+    by_split: dict = {}
+    totals = {"tokens": 0, "cost": 0.0, "rows": 0, "fails": 0}
+    for p in raw_paths:
+        if not p.exists():
+            continue
+        final = (json.loads(p.read_text()).get("final_result") or {})
+        for split, rows in (final.get("detailed_results_by_split") or {}).items():
+            by_split.setdefault(split, []).extend(rows or [])
+            for r in rows or []:
+                totals["rows"] += 1
+                totals["tokens"] += int(r.get("agent_total_tokens") or 0)
+                totals["cost"] += r.get("total_agent_cost") or 0.0
+                if (r.get("reward") or 0) < 1:
+                    totals["fails"] += 1
+
+    def passes(rows):
+        per_task: dict = {}
+        for r in rows:
+            per_task.setdefault(r.get("task_id"), []).append((r.get("reward") or 0) >= 1)
+        if not per_task:
+            return None, None, 0
+        k = max(len(v) for v in per_task.values())
+        p_hat = sum(1 for v in per_task.values() if v and all(v)) / len(per_task)
+        p_at = sum(1 for v in per_task.values() if any(v)) / len(per_task)
+        return p_hat, p_at, k
+
+    all_rows = [r for rows in by_split.values() for r in rows]
+    p_hat, p_at, k = passes(all_rows)
+    by_split_scores = {}
+    for split, rows in by_split.items():
+        sh, sa, sk = passes(rows)
+        if sh is not None:
+            by_split_scores[split] = {f"Pass^{sk}": sh}
+    score = sum(1 for rows in [all_rows] for r in rows if (r.get("reward") or 0) >= 1)
+    return {
+        "score": float(score),
+        "max_score": float(totals["rows"]),
+        "pass_rate": (score / totals["rows"] * 100) if totals["rows"] else 0.0,
+        "pass_power_k_scores": {f"Pass^{k}": p_hat} if p_hat is not None else {},
+        "pass_at_k_scores": {f"Pass@{k}": p_at} if p_at is not None else {},
+        "pass_power_k_scores_by_split": by_split_scores,
+        "detailed_results_by_split": by_split,
+        "_totals": totals,
+    }
+
+
 def _iter_detailed_rows(final_result: dict):
     for split, rows in (final_result.get("detailed_results_by_split") or {}).items():
         for row in rows or []:
@@ -88,7 +161,11 @@ def cmd_run(args: argparse.Namespace) -> None:
                      + ("+askgate" if args.ask_gate else "")
                      + (f"+vote{args.vote}" if args.vote else "")
                      + ("+guard" if args.schema_guard else "")
-                     + ("+firewall" if args.firewall else ""))
+                     + ("+firewall" if args.firewall else "")
+                     # An ablated firewall must not share a label with the full
+                     # one, or the leaderboard silently compares different agents.
+                     + (f"[{args.firewall_checks}]"
+                        if args.firewall and args.firewall_checks else ""))
     run_id = f"{_now_utc().strftime('%Y%m%d-%H%M%S')}-{variant_label}-{split}"
     raw_path = RAW_DIR / f"{run_id}.json"
     scenario_path = SCENARIOS_DIR / f"{run_id}.toml"
@@ -151,25 +228,89 @@ def cmd_run(args: argparse.Namespace) -> None:
         env["AGENT_SCHEMA_GUARD"] = "true"
     if args.firewall:
         env["AGENT_FIREWALL"] = "true"
+    if args.firewall_checks:
+        env["AGENT_FIREWALL_CHECKS"] = args.firewall_checks
+    # Per-run guard-event log: which mechanism fired, how often, on what. A
+    # flat score with zero firings and a flat score with hundreds of firings
+    # are different findings; the run record has to be able to say which.
+    events_path = EVENTS_DIR / f"{run_id}.jsonl"
+    EVENTS_DIR.mkdir(parents=True, exist_ok=True)
+    env["GUARD_EVENTS_PATH"] = str(events_path)
 
     print(f"[experiment] run_id={run_id}")
     print(f"[experiment] variant={args.variant} split={split} tasks/category={tasks} trials={trials}"
           f" model={args.model or env.get('AGENT_LLM', 'gemini/gemini-2.5-flash (default)')}")
     started_at = _now_utc()
-    proc = subprocess.run(
-        [sys.executable, "-m", "agentbeats.run_scenario",
-         str(scenario_path.relative_to(REPO_ROOT)), "--output", str(raw_path.relative_to(REPO_ROOT))],
-        cwd=REPO_ROOT,
-        env=env,
-    )
-    finished_at = _now_utc()
-    if proc.returncode != 0:
-        raise SystemExit(f"[experiment] benchmark run failed (exit {proc.returncode}); no registry entry written")
-    if not raw_path.exists():
-        raise SystemExit(f"[experiment] run finished but {raw_path} was not written")
 
-    payload = json.loads(raw_path.read_text())
-    final = payload.get("final_result") or {}
+    shards = max(1, int(getattr(args, "shards", 1) or 1))
+    if shards > 1:
+        # The evaluator runs tasks sequentially (max_concurrency=1) and the work
+        # is network-bound on the LLM proxy, so wall-clock scales ~1/N by
+        # splitting the task ids across independent evaluator+agent pairs on
+        # separate ports and pooling the results afterwards.
+        ids_by_cat = load_task_ids(split, tasks)
+        shard_procs, shard_raws = [], []
+        for i in range(shards):
+            s_scenario = json.loads(json.dumps(scenario))  # deep copy
+            a_port, e_port = 8080 + 2 * i, 8081 + 2 * i
+            s_scenario["agent_under_test"]["endpoint"] = f"http://127.0.0.1:{a_port}"
+            s_scenario["agent_under_test"]["cmd"] = (
+                f"python src/my_agent/server.py --host 127.0.0.1 --port {a_port}")
+            s_scenario["evaluator"]["endpoint"] = f"http://127.0.0.1:{e_port}"
+            s_scenario["evaluator"]["cmd"] = (
+                f"python src/evaluator/server.py --host 127.0.0.1 --port {e_port}")
+            for cat in CATEGORIES:
+                shard_ids = ids_by_cat.get(cat, [])[i::shards]
+                if shard_ids:
+                    s_scenario["config"][f"tasks_{cat}_task_id_filter"] = shard_ids
+                    s_scenario["config"][f"tasks_{cat}_num_tasks"] = -1
+                else:
+                    # No filter + 0 tasks, else the evaluator falls back to
+                    # num_tasks and this shard re-runs the whole category.
+                    s_scenario["config"].pop(f"tasks_{cat}_task_id_filter", None)
+                    s_scenario["config"][f"tasks_{cat}_num_tasks"] = 0
+            s_path = SCENARIOS_DIR / f"{run_id}-shard{i}.toml"
+            s_raw = RAW_DIR / f"{run_id}-shard{i}.json"
+            with open(s_path, "wb") as f:
+                tomli_w.dump(s_scenario, f)
+            s_env = dict(env)
+            s_env["RUN_ID"] = f"{run_id}-shard{i}"
+            # One events file per shard: these are separate processes, so a
+            # shared file would interleave records past the atomic-append size.
+            s_env["GUARD_EVENTS_PATH"] = str(EVENTS_DIR / f"{run_id}-shard{i}.jsonl")
+            shard_raws.append(s_raw)
+            shard_procs.append(subprocess.Popen(
+                [sys.executable, "-m", "agentbeats.run_scenario",
+                 str(s_path.relative_to(REPO_ROOT)), "--output", str(s_raw.relative_to(REPO_ROOT))],
+                cwd=REPO_ROOT, env=s_env,
+            ))
+            counts = {c: len(ids_by_cat.get(c, [])[i::shards]) for c in CATEGORIES}
+            print(f"[experiment]   shard {i}: ports {a_port}/{e_port}, tasks {counts}")
+        rcs = [p.wait() for p in shard_procs]
+        finished_at = _now_utc()
+        ok = [r for r, rc in zip(shard_raws, rcs) if rc == 0 and r.exists()]
+        if not ok:
+            raise SystemExit("[experiment] all shards failed; no registry entry written")
+        if len(ok) != shards:
+            print(f"[experiment] WARNING: {shards - len(ok)}/{shards} shards failed — "
+                  "metrics below cover only the surviving shards")
+        final = _merge_shards(ok)
+        payload = {"final_result": final, "metadata": {"model": env.get("AGENT_LLM")}}
+        raw_path.write_text(json.dumps(payload, indent=2))
+    else:
+        proc = subprocess.run(
+            [sys.executable, "-m", "agentbeats.run_scenario",
+             str(scenario_path.relative_to(REPO_ROOT)), "--output", str(raw_path.relative_to(REPO_ROOT))],
+            cwd=REPO_ROOT,
+            env=env,
+        )
+        finished_at = _now_utc()
+        if proc.returncode != 0:
+            raise SystemExit(f"[experiment] benchmark run failed (exit {proc.returncode}); no registry entry written")
+        if not raw_path.exists():
+            raise SystemExit(f"[experiment] run finished but {raw_path} was not written")
+        payload = json.loads(raw_path.read_text())
+        final = payload.get("final_result") or {}
 
     total_agent_cost = 0.0
     total_tokens = 0
@@ -205,6 +346,12 @@ def cmd_run(args: argparse.Namespace) -> None:
         "total_trial_rows": total_rows,
         "output_path": str(raw_path.relative_to(REPO_ROOT)),
     }
+    # Unsharded writes one file; sharded writes one per shard.
+    event_files = sorted(EVENTS_DIR.glob(f"{run_id}*.jsonl"))
+    guard_summary = guard_events.aggregate(event_files)
+    if guard_summary:
+        record["guard_events"] = guard_summary
+        record["guard_events_path"] = [str(p.relative_to(REPO_ROOT)) for p in event_files]
     _append_run(record)
 
     print("\n[experiment] ===== run summary =====")
@@ -214,6 +361,16 @@ def cmd_run(args: argparse.Namespace) -> None:
     print(f"  Pass@k:     {record['pass_at_k']}")
     print(f"  cost:       ${record['total_agent_cost']} agent-side, {total_tokens} tokens")
     print(f"  failures:   {failed_tasks}/{total_rows} trial rows")
+    if guard_summary:
+        print(f"  guards:     {guard_summary['total']} firings across "
+              f"{guard_summary['contexts_touched']} contexts "
+              f"{guard_summary['by_mechanism']}")
+        if guard_summary.get("firewall_by_kind"):
+            print(f"  firewall:   {guard_summary['firewall_by_kind']}")
+    elif args.firewall or args.schema_guard:
+        # The distinction that makes a flat result readable.
+        print("  guards:     enabled but never fired — a flat score here is "
+              "'no effect to measure', not 'mechanism did not help'")
     print(f"  raw result: {record['output_path']}")
     if failed_tasks:
         print(f"  next:       uv run python tools/experiment.py analyze --run {run_id}")
@@ -359,6 +516,10 @@ def main() -> None:
     p_run.add_argument("--vote", type=int, default=0, help="Self-consistency voting: K samples per turn (0 = off)")
     p_run.add_argument("--schema-guard", action="store_true", help="Deterministic tool-call schema validation + corrective regen")
     p_run.add_argument("--firewall", action="store_true", help="Deterministic action firewall (ledger + provenance + compiled policy constraints)")
+    p_run.add_argument("--shards", type=int, default=1,
+                       help="Split the task set across N parallel evaluator+agent pairs (~N x faster; the work is proxy-bound, not CPU-bound)")
+    p_run.add_argument("--firewall-checks", default=None,
+                       help="Ablate the firewall: comma-separated subset of precondition,default,provenance (default all)")
     p_run.add_argument("--smoke", action="store_true", help="Shortcut: train split, 1 task/category, 1 trial")
     p_run.set_defaults(func=cmd_run)
 
