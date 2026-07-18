@@ -58,8 +58,10 @@ on:
 permissions:
   contents: read
 
+# Ref-scoped so runs dispatched from a side branch (e.g. a runner smoke test)
+# never queue behind — or cancel — evaluations dispatched from main.
 concurrency:
-  group: car-bench-eval
+  group: car-bench-eval-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
