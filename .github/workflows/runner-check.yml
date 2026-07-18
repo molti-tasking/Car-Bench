@@ -1,0 +1,51 @@
+name: Self-hosted runner check
+
+# Tiny smoke job to verify a self-hosted runner is registered, online, and fit
+# for evaluation runs (tooling, disk, and LiteLLM proxy reachability). Safe to
+# re-run any time; no concurrency group, so it never queues behind evaluations.
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner label to test"
+        default: "self-hosted"
+
+jobs:
+  check:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 5
+    steps:
+      - name: Runner identity
+        run: |
+          echo "runner name : $RUNNER_NAME"
+          echo "os/arch     : $RUNNER_OS / $RUNNER_ARCH"
+          echo "hostname    : $(hostname)"
+          uname -a
+
+      - name: Resources
+        run: |
+          echo "cpus  : $(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+          free -h 2>/dev/null || vm_stat | head -4
+          df -h . | tail -1
+
+      - name: Required tooling
+        run: |
+          for t in git python3 curl docker; do
+            if command -v "$t" >/dev/null 2>&1; then
+              echo "ok      : $t ($($t --version 2>&1 | head -1))"
+            else
+              echo "MISSING : $t"
+            fi
+          done
+
+      - name: LiteLLM proxy reachability
+        env:
+          LITE_LLM_API_BASE: ${{ secrets.LITE_LLM_API_BASE }}
+        run: |
+          if [ -z "$LITE_LLM_API_BASE" ]; then
+            echo "LITE_LLM_API_BASE secret not set — skipping"
+            exit 0
+          fi
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -m 10 "$LITE_LLM_API_BASE/health/liveliness" || echo "unreachable")
+          echo "proxy liveliness: HTTP $code"
