@@ -25,6 +25,9 @@ from google.protobuf.json_format import MessageToDict
 from litellm import completion
 
 from observability import tracing_configured, trace_metadata
+from firewall import (
+    StateLedger, ProvenanceIndex, compile_constraints, check_action, suspect_entities,
+)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from logging_utils import configure_logger
@@ -103,7 +106,10 @@ class MyAgentExecutor(AgentExecutor):
         vote_k: int = 0,
         vote_temperature: float = 0.7,
         schema_guard: bool = False,
+        firewall: bool = False,
     ):
+        self.firewall = firewall
+        self.ctx_id_to_constraints: dict[str, dict | None] = {}
         self.self_check = self_check
         self.self_check_model = self_check_model
         self.ask_gate = ask_gate
@@ -216,7 +222,8 @@ class MyAgentExecutor(AgentExecutor):
                     )
         return violations
 
-    def _run_self_check(self, messages: list[dict], draft: str, turn_m: dict) -> str | None:
+    def _run_self_check(self, messages: list[dict], draft: str, turn_m: dict,
+                        suspects: list[str] | None = None) -> str | None:
         """One verification pass before a user-facing reply is sent.
 
         Returns a revised response iff the draft claims an unexecuted action;
@@ -240,6 +247,13 @@ class MyAgentExecutor(AgentExecutor):
             f"Letzte Nutzernachrichten:\n{json.dumps(recent_user, ensure_ascii=False)}\n\n"
             f"Antwortentwurf:\n{draft}"
         )
+        if suspects:
+            check_input += (
+                "\n\nDeterministischer Vorbefund: Der Entwurf erwähnt "
+                + ", ".join(suspects)
+                + " — für diese Komponenten gibt es KEINEN erfolgreichen Werkzeugaufruf."
+                " Prüfe besonders, ob der Entwurf hier etwas behauptet."
+            )
         completion_kwargs = {
             "model": self.self_check_model or self.model,
             "temperature": 0.0,
@@ -467,6 +481,42 @@ class MyAgentExecutor(AgentExecutor):
                     except Exception as guard_err:
                         ctx_logger.warning(f"Schema-guard regeneration failed, keeping draft: {guard_err}")
 
+            # Optional action firewall: deterministic policy-precondition and
+            # value-provenance checks against a ledger of verified tool results.
+            # Advisory only — violations trigger one corrective regeneration.
+            if self.firewall and tool_calls:
+                try:
+                    if context.context_id not in self.ctx_id_to_constraints:
+                        policy = next((m.get("content", "") for m in messages
+                                       if m.get("role") == "system"), "")
+                        self.ctx_id_to_constraints[context.context_id] = compile_constraints(
+                            policy, tools, completion, completion_kwargs, ctx_logger)
+                        turn_m[NUM_LLM_CALLS] += 1
+                    constraints = self.ctx_id_to_constraints.get(context.context_id)
+                    ledger = StateLedger.from_messages(messages)
+                    prov = ProvenanceIndex.build(messages, ledger)
+                    fw_violations = check_action(tool_calls, ledger, prov, constraints)
+                    if fw_violations:
+                        ctx_logger.info("Firewall flagged action", violations=fw_violations)
+                        nudge = (
+                            "Interner Hinweis — die geplante Aktion verletzt überprüfbare Regeln:\n- "
+                            + "\n- ".join(fw_violations)
+                            + "\nKorrigiere die Werkzeugaufrufe entsprechend (Standardwerte und"
+                            " Vorbedingungen aus den Richtlinien beachten), oder erkläre dem Nutzer,"
+                            " warum du anders vorgehst."
+                        )
+                        resp2 = completion(messages=messages + [{"role": "system", "content": nudge}],
+                                           **completion_kwargs)
+                        usage = getattr(resp2, "usage", None)
+                        if usage:
+                            turn_m[PROMPT_TOKENS] += getattr(usage, "prompt_tokens", 0) or 0
+                            turn_m[COMPLETION_TOKENS] += getattr(usage, "completion_tokens", 0) or 0
+                        turn_m[NUM_LLM_CALLS] += 1
+                        assistant_content = resp2.choices[0].message.model_dump(exclude_unset=True)
+                        tool_calls = assistant_content.get("tool_calls")
+                except Exception as fw_err:
+                    ctx_logger.warning(f"Firewall check failed, keeping action: {fw_err}")
+
             # Optional ask-gate: about to ask a clarifying question without
             # ever having consulted stored preferences? One internal nudge to
             # look up first, then the regenerated decision stands.
@@ -500,7 +550,18 @@ class MyAgentExecutor(AgentExecutor):
             # calls this turn): catches claimed-but-unexecuted actions.
             if self.self_check and not tool_calls and assistant_content.get("content"):
                 try:
-                    revised = self._run_self_check(messages, assistant_content["content"], turn_m)
+                    # Firewall cascade: a cheap deterministic pre-filter names the
+                    # entities the draft talks about that no successful tool call
+                    # supports, so the LLM checker gets a pointed question instead
+                    # of an open-ended "did you fabricate anything?".
+                    suspects = []
+                    if self.firewall:
+                        suspects = suspect_entities(
+                            assistant_content["content"], StateLedger.from_messages(messages), tools)
+                        if suspects:
+                            ctx_logger.info("Firewall flagged unsupported entities", suspects=suspects)
+                    revised = self._run_self_check(
+                        messages, assistant_content["content"], turn_m, suspects)
                     if revised:
                         ctx_logger.info("Self-check revised the draft response")
                         assistant_content["content"] = revised

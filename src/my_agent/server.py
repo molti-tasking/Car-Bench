@@ -109,6 +109,7 @@ def resolve_config() -> dict:
         "vote_k": int(os.getenv("AGENT_VOTE_K", "0") or 0),
         "vote_temperature": float(os.getenv("AGENT_VOTE_TEMPERATURE", "0.7")),
         "schema_guard": os.getenv("AGENT_SCHEMA_GUARD", "false").lower() == "true",
+        "firewall": os.getenv("AGENT_FIREWALL", "false").lower() == "true",
         # For litellm_proxy/* models the proxy credentials come from the
         # normalized LITELLM_PROXY_* env vars; explicit AGENT_API_KEY/BASE
         # still override. Direct provider models (anthropic/..., gemini/...)
@@ -158,6 +159,7 @@ def main():
             vote_k=config["vote_k"],
             vote_temperature=config["vote_temperature"],
             schema_guard=config["schema_guard"],
+            firewall=config["firewall"],
         ),
         task_store=InMemoryTaskStore(),
         agent_card=card,
