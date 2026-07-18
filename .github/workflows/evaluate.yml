@@ -144,8 +144,15 @@ jobs:
             curl -sS -m 20 -H "Authorization: Bearer $LITE_LLM_API_KEY" \
               "$LITE_LLM_API_BASE/v1/models" | python3 -c "
           import json, sys
-          for m in json.load(sys.stdin).get('data', []):
-              print(' -', m.get('id'))
+          from collections import Counter
+          ids = sorted(m.get('id') or '' for m in json.load(sys.stdin).get('data', []))
+          passthrough = Counter(i.split('/', 1)[0] for i in ids if i.split('/', 1)[0] in
+                                ('openai', 'anthropic', 'gemini', 'mistral', 'gemini-pro-latest'))
+          for i in ids:
+              if i.split('/', 1)[0] not in ('openai', 'anthropic', 'gemini', 'mistral') and not i.startswith('gemini'):
+                  print(' -', i)
+          for p, n in sorted(passthrough.items()):
+              print(f' - {p}/* ({n} passthrough models)')
           "
             exit 0
           fi
