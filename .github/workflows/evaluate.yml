@@ -54,6 +54,16 @@ on:
       runner:
         description: "Runner label (ubuntu-latest, or your self-hosted label)"
         default: "ubuntu-latest"
+      agent_llm:
+        description: "LiteLLM model string for the agent under test"
+        default: "litellm_proxy/natai/glm"
+      shards:
+        description: "Parallel evaluator+agent pairs (~N x faster; proxy-bound)"
+        default: "1"
+      probe:
+        description: "List the proxy's available models instead of evaluating"
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -109,7 +119,7 @@ jobs:
           LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
           LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
           LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
-          AGENT_LLM: litellm_proxy/natai/glm
+          AGENT_LLM: ${{ inputs.agent_llm }}
           # Benchmark fixtures run on the same self-hosted proxy
           USER_SIM_MODEL: litellm_proxy/natai/glm
           USER_SIM_THINKING: "false"
@@ -125,10 +135,23 @@ jobs:
           FIREWALL: ${{ inputs.firewall }}
           FIREWALL_CHECKS: ${{ inputs.firewall_checks }}
           SCHEMA_GUARD: ${{ inputs.schema_guard }}
+          SHARDS: ${{ inputs.shards }}
+          PROBE: ${{ inputs.probe }}
         run: |
           set -euo pipefail
+          if [ "$PROBE" = "true" ]; then
+            echo "[probe] models served by the LiteLLM proxy:"
+            curl -sS -m 20 -H "Authorization: Bearer $LITE_LLM_API_KEY" \
+              "$LITE_LLM_API_BASE/v1/models" | python3 -c "
+          import json, sys
+          for m in json.load(sys.stdin).get('data', []):
+              print(' -', m.get('id'))
+          "
+            exit 0
+          fi
           ARGS=(--variant "$VARIANT" --split "$SPLIT" --trials "$TRIALS")
           if [ "$TASKS" = "-1" ]; then ARGS+=(--full); else ARGS+=(--tasks "$TASKS"); fi
+          if [ "$SHARDS" != "1" ] && [ -n "$SHARDS" ]; then ARGS+=(--shards "$SHARDS"); fi
           if [ "$SELF_CHECK" = "true" ]; then ARGS+=(--self-check); fi
           if [ "$FIREWALL" = "true" ]; then ARGS+=(--firewall); fi
           if [ "$SCHEMA_GUARD" = "true" ]; then ARGS+=(--schema-guard); fi
