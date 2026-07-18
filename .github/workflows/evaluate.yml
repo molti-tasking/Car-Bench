@@ -1,0 +1,182 @@
+name: Evaluate agent variants
+
+# Runs one benchmark evaluation per agent variant in parallel, then merges the
+# results into the improvement console and publishes it to GitHub Pages.
+#
+# Manual trigger (Actions -> Evaluate agent variants -> Run workflow).
+#
+# Required repository secrets:
+#   LITE_LLM_API_KEY, LITE_LLM_API_BASE   self-hosted proxy credentials
+# Optional:
+#   LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
+#
+# NOTE: GitHub-hosted runners cap a job at 6h and must be able to reach the
+# LiteLLM proxy over the public internet. Full-test-split runs (~6h) need a
+# self-hosted runner — set the `runner` input to your runner's label.
+
+on:
+  workflow_dispatch:
+    inputs:
+      variants:
+        description: "Comma-separated prompt variants"
+        default: "baseline,v4_german"
+      split:
+        description: "Task split"
+        default: "train"
+        type: choice
+        options: ["train", "test"]
+      tasks:
+        description: "Tasks per category (-1 = whole split)"
+        default: "5"
+      trials:
+        description: "Trials per task (3 needed for Pass^3)"
+        default: "1"
+      self_check:
+        description: "Enable the self-check harness"
+        default: true
+        type: boolean
+      firewall:
+        description: "Enable the deterministic action firewall"
+        default: false
+        type: boolean
+      runner:
+        description: "Runner label (ubuntu-latest, or your self-hosted label)"
+        default: "ubuntu-latest"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: car-bench-eval
+  cancel-in-progress: false
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      variants: ${{ steps.build.outputs.variants }}
+    steps:
+      - id: build
+        run: |
+          python3 -c "
+          import json, os
+          raw = os.environ['VARIANTS']
+          items = [v.strip() for v in raw.split(',') if v.strip()]
+          print('variants=' + json.dumps(items))
+          " >> "$GITHUB_OUTPUT"
+        env:
+          VARIANTS: ${{ inputs.variants }}
+
+  evaluate:
+    needs: matrix
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 350   # stay under the 6h hosted-runner ceiling
+    strategy:
+      fail-fast: false     # one variant failing must not kill the rest
+      matrix:
+        variant: ${{ fromJson(needs.matrix.outputs.variants) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Clone CAR-bench evaluator
+        run: ./scripts/setup_car_bench.sh
+
+      - name: Install dependencies
+        run: uv sync --extra track-1-agent --extra car-bench-evaluator
+
+      - name: Run evaluation
+        env:
+          LITE_LLM_API_KEY: ${{ secrets.LITE_LLM_API_KEY }}
+          LITE_LLM_API_BASE: ${{ secrets.LITE_LLM_API_BASE }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+          AGENT_LLM: litellm_proxy/natai/glm
+          # Benchmark fixtures run on the same self-hosted proxy
+          USER_SIM_MODEL: litellm_proxy/natai/glm
+          USER_SIM_THINKING: "false"
+          POLICY_EVAL_MODEL: litellm_proxy/natai/kimi-k2.5
+          JUDGE_MODEL: litellm_proxy/natai/kimi-k2.5
+        run: |
+          set -euo pipefail
+          ARGS=(--variant "${{ matrix.variant }}" --split "${{ inputs.split }}" --trials "${{ inputs.trials }}")
+          if [ "${{ inputs.tasks }}" = "-1" ]; then ARGS+=(--full); else ARGS+=(--tasks "${{ inputs.tasks }}"); fi
+          if [ "${{ inputs.self_check }}" = "true" ]; then ARGS+=(--self-check); fi
+          if [ "${{ inputs.firewall }}" = "true" ]; then ARGS+=(--firewall); fi
+          uv run python tools/experiment.py run "${ARGS[@]}"
+
+      - name: Collect results
+        if: always()
+        run: |
+          mkdir -p out/raw
+          cp experiments/raw/*.json out/raw/ 2>/dev/null || true
+          # only this job's registry line(s) — the publish job merges them
+          cp experiments/runs.jsonl out/runs.jsonl 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.variant }}
+          path: out/
+          retention-days: 30
+
+  publish:
+    needs: evaluate
+    if: always()
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: incoming
+          pattern: results-*
+          merge-multiple: false
+
+      - name: Merge results into the registry
+        run: |
+          set -euo pipefail
+          mkdir -p experiments/raw
+          # Raw payloads from every variant
+          find incoming -path '*/raw/*.json' -exec cp {} experiments/raw/ \; 2>/dev/null || true
+          # Registry: committed history + every new line, de-duplicated by run_id
+          find incoming -name 'runs.jsonl' -exec cat {} \; >> experiments/runs.jsonl 2>/dev/null || true
+          python3 -c "
+          import json, pathlib
+          p = pathlib.Path('experiments/runs.jsonl')
+          seen, out = set(), []
+          for line in p.read_text().splitlines():
+              if not line.strip():
+                  continue
+              rec = json.loads(line)
+              if rec['run_id'] in seen:
+                  continue
+              seen.add(rec['run_id'])
+              out.append(line)
+          p.write_text('\n'.join(out) + '\n')
+          print(f'{len(out)} unique runs')
+          "
+
+      - name: Build the improvement console
+        run: |
+          uv sync --extra track-1-agent
+          uv run python tools/dashboard.py
+          mkdir -p site
+          cp experiments/dashboard.html site/index.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
