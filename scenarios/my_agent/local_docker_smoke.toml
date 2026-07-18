@@ -1,14 +1,20 @@
-# Local Docker smoke scenario for my_agent.
-# Generate with:
+# Local Docker smoke scenario for my_agent (champion config, self-hosted proxy).
+# Validates the SUBMISSION artifact: our containerized agent speaking A2A to the
+# official evaluator image. Generate with:
 #   uv run python generate_compose.py --scenario scenarios/my_agent/local_docker_smoke.toml
+#
+# The official evaluator image runs the organizers' code — it lacks my
+# LITE_LLM_* alias, so the simulator/policy-judge get litellm's NATIVE
+# LITELLM_PROXY_* names here, plus user_model set in [config]. The agent image
+# has my code, so LITE_LLM_* is fine for it.
 
 [evaluator]
 image = "ghcr.io/car-bench/car-bench-evaluator:latest"
-env = { GEMINI_API_KEY = "${GEMINI_API_KEY:?Set GEMINI_API_KEY in .env}", LOGURU_LEVEL = "${LOGURU_LEVEL:-INFO}" }
+env = { LITELLM_PROXY_API_KEY = "${LITE_LLM_API_KEY:?Set LITE_LLM_API_KEY in .env}", LITELLM_PROXY_API_BASE = "${LITE_LLM_API_BASE:?Set LITE_LLM_API_BASE in .env}", LOGURU_LEVEL = "${LOGURU_LEVEL:-INFO}" }
 
 [agent_under_test]
 build = { context = ".", dockerfile = "src/my_agent/Dockerfile.my-agent" }
-env = { ANTHROPIC_API_KEY = "${ANTHROPIC_API_KEY:-}", OPENAI_API_KEY = "${OPENAI_API_KEY:-}", GEMINI_API_KEY = "${GEMINI_API_KEY:?Set GEMINI_API_KEY in .env}", AGENT_LLM = "${AGENT_LLM:-gemini/gemini-2.5-flash}", AGENT_TEMPERATURE = "${AGENT_TEMPERATURE:-0.0}", AGENT_REASONING_EFFORT = "${AGENT_REASONING_EFFORT:-}", AGENT_PROMPT_VARIANT = "${AGENT_PROMPT_VARIANT:-baseline}", AGENT_SYSTEM_PROMPT_PREFIX = "${AGENT_SYSTEM_PROMPT_PREFIX:-}", AGENT_SYSTEM_PROMPT_SUFFIX = "${AGENT_SYSTEM_PROMPT_SUFFIX:-}", LOGURU_LEVEL = "${LOGURU_LEVEL:-INFO}" }
+env = { LITE_LLM_API_KEY = "${LITE_LLM_API_KEY:?Set LITE_LLM_API_KEY in .env}", LITE_LLM_API_BASE = "${LITE_LLM_API_BASE:?Set LITE_LLM_API_BASE in .env}", AGENT_LLM = "${AGENT_LLM:-litellm_proxy/natai/glm}", AGENT_PROMPT_VARIANT = "${AGENT_PROMPT_VARIANT:-v4_german}", AGENT_SELF_CHECK = "${AGENT_SELF_CHECK:-true}", AGENT_TEMPERATURE = "${AGENT_TEMPERATURE:-0.0}", AGENT_LLM_TIMEOUT = "${AGENT_LLM_TIMEOUT:-300}", LOGURU_LEVEL = "${LOGURU_LEVEL:-INFO}" }
 
 [config]
 num_trials = 1
@@ -17,3 +23,8 @@ tasks_base_num_tasks = 1
 tasks_hallucination_num_tasks = 1
 tasks_disambiguation_num_tasks = 1
 max_steps = 50
+user_model = "litellm_proxy/natai/glm"
+user_provider = "litellm_proxy"
+user_thinking = false
+policy_evaluator_model = "litellm_proxy/natai/kimi-k2.5"
+policy_evaluator_provider = "litellm_proxy"
