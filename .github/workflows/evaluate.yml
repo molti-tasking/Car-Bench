@@ -26,17 +26,29 @@ on:
         type: choice
         options: ["train", "test"]
       tasks:
-        description: "Tasks per category (-1 = whole split)"
-        default: "5"
+        # 15/category = 45 tasks, so one task is ~2.2pp. At 5/category a single
+        # task swings the score 6.7pp, which is wider than any effect measured
+        # in this campaign so far.
+        description: "Tasks per category (-1 = whole split; below 15 cannot resolve a real effect)"
+        default: "15"
       trials:
-        description: "Trials per task (3 needed for Pass^3)"
-        default: "1"
+        # trials=1 yields Pass^1 only. Pass^3 — the competition metric, and the
+        # one the harness is designed around — needs 3.
+        description: "Trials per task (3 needed for Pass^3; 1 measures Pass^1 only)"
+        default: "3"
       self_check:
         description: "Enable the self-check harness"
         default: true
         type: boolean
       firewall:
         description: "Enable the deterministic action firewall"
+        default: false
+        type: boolean
+      firewall_checks:
+        description: "Ablate the firewall: subset of precondition,default,provenance (blank = all)"
+        default: ""
+      schema_guard:
+        description: "Enable the deterministic tool-call schema guard"
         default: false
         type: boolean
       runner:
@@ -101,12 +113,25 @@ jobs:
           USER_SIM_THINKING: "false"
           POLICY_EVAL_MODEL: litellm_proxy/natai/kimi-k2.5
           JUDGE_MODEL: litellm_proxy/natai/kimi-k2.5
+          # Dispatch inputs reach the shell as env vars, never interpolated
+          # into the script body.
+          VARIANT: ${{ matrix.variant }}
+          SPLIT: ${{ inputs.split }}
+          TASKS: ${{ inputs.tasks }}
+          TRIALS: ${{ inputs.trials }}
+          SELF_CHECK: ${{ inputs.self_check }}
+          FIREWALL: ${{ inputs.firewall }}
+          FIREWALL_CHECKS: ${{ inputs.firewall_checks }}
+          SCHEMA_GUARD: ${{ inputs.schema_guard }}
         run: |
           set -euo pipefail
-          ARGS=(--variant "${{ matrix.variant }}" --split "${{ inputs.split }}" --trials "${{ inputs.trials }}")
-          if [ "${{ inputs.tasks }}" = "-1" ]; then ARGS+=(--full); else ARGS+=(--tasks "${{ inputs.tasks }}"); fi
-          if [ "${{ inputs.self_check }}" = "true" ]; then ARGS+=(--self-check); fi
-          if [ "${{ inputs.firewall }}" = "true" ]; then ARGS+=(--firewall); fi
+          ARGS=(--variant "$VARIANT" --split "$SPLIT" --trials "$TRIALS")
+          if [ "$TASKS" = "-1" ]; then ARGS+=(--full); else ARGS+=(--tasks "$TASKS"); fi
+          if [ "$SELF_CHECK" = "true" ]; then ARGS+=(--self-check); fi
+          if [ "$FIREWALL" = "true" ]; then ARGS+=(--firewall); fi
+          if [ "$SCHEMA_GUARD" = "true" ]; then ARGS+=(--schema-guard); fi
+          if [ -n "$FIREWALL_CHECKS" ]; then ARGS+=(--firewall-checks "$FIREWALL_CHECKS"); fi
+          echo "[ci] experiment.py run ${ARGS[*]}"
           uv run python tools/experiment.py run "${ARGS[@]}"
 
       - name: Collect results
@@ -128,6 +153,8 @@ jobs:
     needs: evaluate
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: write     # the registry is committed back, not just archived
     steps:
       - uses: actions/checkout@v4
 
@@ -137,15 +164,29 @@ jobs:
           pattern: results-*
           merge-multiple: false
 
-      - name: Merge results into the registry
+      - name: Merge results into the registry and commit it back
+        # workflow_dispatch inputs reach the shell as env vars, never as
+        # ${{ }} interpolation into the script body.
+        env:
+          VARIANTS: ${{ inputs.variants }}
         run: |
           set -euo pipefail
           mkdir -p experiments/raw
-          # Raw payloads from every variant
+          # Raw payloads stay artifact-only: experiments/raw/ is gitignored and
+          # a full-split round is tens of MB.
           find incoming -path '*/raw/*.json' -exec cp {} experiments/raw/ \; 2>/dev/null || true
-          # Registry: committed history + every new line, de-duplicated by run_id
-          find incoming -name 'runs.jsonl' -exec cat {} \; >> experiments/runs.jsonl 2>/dev/null || true
-          python3 -c "
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # runs.jsonl is append-only and both sides append, so a rebase would
+          # conflict on essentially every new line. Instead rebuild the file
+          # from the freshest remote state on each attempt and re-merge, which
+          # is conflict-free by construction and idempotent (dedup by run_id).
+          merge_onto_remote() {
+            git checkout "origin/${BRANCH}" -- experiments/runs.jsonl 2>/dev/null || true
+            find incoming -name 'runs.jsonl' -exec cat {} \; >> experiments/runs.jsonl 2>/dev/null || true
+            python3 - <<'PY'
           import json, pathlib
           p = pathlib.Path('experiments/runs.jsonl')
           seen, out = set(), []
@@ -153,13 +194,37 @@ jobs:
               if not line.strip():
                   continue
               rec = json.loads(line)
-              if rec['run_id'] in seen:
+              if rec['run_id'] in seen:   # artifact lines duplicate committed history
                   continue
               seen.add(rec['run_id'])
               out.append(line)
           p.write_text('\n'.join(out) + '\n')
-          print(f'{len(out)} unique runs')
-          "
+          print(f'{len(out)} unique runs in the registry')
+          PY
+          }
+
+          BRANCH="${GITHUB_REF_NAME}"
+          for attempt in 1 2 3; do
+            git fetch --quiet origin "${BRANCH}"
+            merge_onto_remote
+            git add experiments/runs.jsonl
+            if git diff --cached --quiet; then
+              echo "no new runs to record"
+              exit 0
+            fi
+            git commit --quiet -m "chore(ci): record run(s) from ${GITHUB_RUN_ID}" \
+                                -m "Workflow: ${GITHUB_WORKFLOW} · variants: ${VARIANTS}"
+            if git push --quiet origin "HEAD:${BRANCH}"; then
+              echo "registry pushed to ${BRANCH}"
+              exit 0
+            fi
+            echo "push rejected (attempt ${attempt}/3) — rebuilding on the new remote head"
+            git reset --hard --quiet "origin/${BRANCH}"   # untracked incoming/ survives
+            sleep 5
+          done
+          echo "::error::could not push the registry after 3 attempts. Results are still \
+          in the artifacts; check branch protection on ${BRANCH}."
+          exit 1
 
       - name: Build the improvement console
         run: |
