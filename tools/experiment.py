@@ -180,6 +180,32 @@ def _preflight_ports(ports: list[int]) -> None:
     )
 
 
+def _free_port_pair(start: int = 8080) -> tuple[int, int]:
+    """Two free localhost ports.
+
+    Every run used to hardcode 8080/8081, so launching a second run while one
+    was in flight failed the agent-readiness check and died leaving only an
+    orphan scenario file — three ablation runs were lost that way before it
+    was noticed. Bind-testing makes concurrent runs safe.
+    """
+    import socket
+
+    found: list[int] = []
+    port = start
+    while len(found) < 2 and port < start + 200:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                s.bind(("127.0.0.1", port))
+                found.append(port)
+            except OSError:
+                pass
+        port += 1
+    if len(found) < 2:
+        raise SystemExit("[experiment] no free port pair found in 8080-8280")
+    return found[0], found[1]
+
+
 def _iter_detailed_rows(final_result: dict):
     for split, rows in (final_result.get("detailed_results_by_split") or {}).items():
         for row in rows or []:
@@ -212,8 +238,13 @@ def cmd_run(args: argparse.Namespace) -> None:
     raw_path = RAW_DIR / f"{run_id}.json"
     scenario_path = SCENARIOS_DIR / f"{run_id}.toml"
 
+    # Auto-skip occupied ports. --base-port only helps if you remember to pass
+    # it; three ablation runs were already lost to a silent collision with an
+    # in-flight run, so the default has to be safe rather than merely settable.
     base_port = int(getattr(args, "base_port", 8080) or 8080)
-    agent_port, eval_port = base_port, base_port + 1
+    agent_port, eval_port = _free_port_pair(base_port)
+    if (agent_port, eval_port) != (base_port, base_port + 1):
+        print(f"[experiment] ports {base_port}/{base_port+1} busy — using {agent_port}/{eval_port}")
     scenario = {
         "evaluator": {
             "endpoint": f"http://127.0.0.1:{eval_port}",
