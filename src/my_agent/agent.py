@@ -26,8 +26,10 @@ from litellm import completion
 
 from observability import tracing_configured, trace_metadata
 from firewall import (
-    StateLedger, ProvenanceIndex, compile_constraints, check_action, suspect_entities,
+    CHECK_KINDS, StateLedger, ProvenanceIndex, compile_constraints, check_action,
+    suspect_entities,
 )
+import guard_events
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from logging_utils import configure_logger
@@ -107,8 +109,10 @@ class MyAgentExecutor(AgentExecutor):
         vote_temperature: float = 0.7,
         schema_guard: bool = False,
         firewall: bool = False,
+        firewall_checks: set | None = None,
     ):
         self.firewall = firewall
+        self.firewall_checks = CHECK_KINDS if firewall_checks is None else firewall_checks
         self.ctx_id_to_constraints: dict[str, dict | None] = {}
         self.self_check = self_check
         self.self_check_model = self_check_model
@@ -453,6 +457,8 @@ class MyAgentExecutor(AgentExecutor):
                     try:
                         ctx_logger.info("Schema-guard caught invalid tool calls; regenerating",
                                         violations=violations)
+                        guard_events.emit("schema_guard", context.context_id,
+                                          count=len(violations), violations=violations)
                         nudge = (
                             "Interner Hinweis: Der zuletzt erzeugte Werkzeugaufruf ist ungültig:\n- "
                             + "\n- ".join(violations)
@@ -495,12 +501,17 @@ class MyAgentExecutor(AgentExecutor):
                     constraints = self.ctx_id_to_constraints.get(context.context_id)
                     ledger = StateLedger.from_messages(messages)
                     prov = ProvenanceIndex.build(messages, ledger)
-                    fw_violations = check_action(tool_calls, ledger, prov, constraints)
+                    fw_violations = check_action(tool_calls, ledger, prov, constraints,
+                                                 self.firewall_checks)
                     if fw_violations:
-                        ctx_logger.info("Firewall flagged action", violations=fw_violations)
+                        kinds = [v["kind"] for v in fw_violations]
+                        messages_out = [v["message"] for v in fw_violations]
+                        ctx_logger.info("Firewall flagged action", violations=messages_out)
+                        guard_events.emit("firewall", context.context_id,
+                                          kinds=kinds, violations=messages_out)
                         nudge = (
                             "Interner Hinweis — die geplante Aktion verletzt überprüfbare Regeln:\n- "
-                            + "\n- ".join(fw_violations)
+                            + "\n- ".join(messages_out)
                             + "\nKorrigiere die Werkzeugaufrufe entsprechend (Standardwerte und"
                             " Vorbedingungen aus den Richtlinien beachten), oder erkläre dem Nutzer,"
                             " warum du anders vorgehst."
@@ -533,6 +544,7 @@ class MyAgentExecutor(AgentExecutor):
             ):
                 try:
                     ctx_logger.info("Ask-gate: regenerating with preference-lookup nudge")
+                    guard_events.emit("ask_gate", context.context_id)
                     nudged = messages + [{"role": "system", "content": ASK_GATE_NUDGE}]
                     response = completion(messages=nudged, **completion_kwargs)
                     usage = getattr(response, "usage", None)
@@ -560,10 +572,14 @@ class MyAgentExecutor(AgentExecutor):
                             assistant_content["content"], StateLedger.from_messages(messages), tools)
                         if suspects:
                             ctx_logger.info("Firewall flagged unsupported entities", suspects=suspects)
+                            guard_events.emit("suspect_entities", context.context_id,
+                                              suspects=suspects)
                     revised = self._run_self_check(
                         messages, assistant_content["content"], turn_m, suspects)
                     if revised:
                         ctx_logger.info("Self-check revised the draft response")
+                        guard_events.emit("self_check_revised", context.context_id,
+                                          had_suspects=bool(suspects))
                         assistant_content["content"] = revised
                 except Exception as check_err:
                     ctx_logger.warning(f"Self-check failed, sending draft: {check_err}")

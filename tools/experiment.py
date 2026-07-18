@@ -138,6 +138,48 @@ def _merge_shards(raw_paths: list[Path]) -> dict:
     }
 
 
+def _port_busy(port: int) -> bool:
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind(("127.0.0.1", port))
+            return False
+        except OSError:
+            return True
+
+
+def _preflight_ports(ports: list[int]) -> None:
+    """Fail fast and legibly on an occupied port.
+
+    The orchestrator's symptom for this is 'Agent process exited before
+    readiness', which reads like an agent bug and costs a debugging session.
+    The usual cause is another run still in flight — so name the occupant
+    rather than suggesting anything be killed.
+    """
+    busy = [p for p in ports if _port_busy(p)]
+    if not busy:
+        return
+    import shutil
+    import subprocess as sp
+    detail = ""
+    if shutil.which("lsof"):
+        try:
+            out = sp.run(["lsof", "-nP", "-sTCP:LISTEN",
+                          *[f"-iTCP:{p}" for p in busy]],
+                         capture_output=True, text=True, timeout=5).stdout.strip()
+            if out:
+                detail = "\n" + out
+        except Exception:
+            pass
+    raise SystemExit(
+        f"[experiment] port(s) already in use: {busy}{detail}\n"
+        f"[experiment] Another run is probably still going — check before killing "
+        f"anything.\n[experiment] To run alongside it: --base-port "
+        f"{max(busy) + 1}"
+    )
+
+
 def _iter_detailed_rows(final_result: dict):
     for split, rows in (final_result.get("detailed_results_by_split") or {}).items():
         for row in rows or []:
@@ -170,14 +212,16 @@ def cmd_run(args: argparse.Namespace) -> None:
     raw_path = RAW_DIR / f"{run_id}.json"
     scenario_path = SCENARIOS_DIR / f"{run_id}.toml"
 
+    base_port = int(getattr(args, "base_port", 8080) or 8080)
+    agent_port, eval_port = base_port, base_port + 1
     scenario = {
         "evaluator": {
-            "endpoint": "http://127.0.0.1:8081",
-            "cmd": "python src/evaluator/server.py --host 127.0.0.1 --port 8081",
+            "endpoint": f"http://127.0.0.1:{eval_port}",
+            "cmd": f"python src/evaluator/server.py --host 127.0.0.1 --port {eval_port}",
         },
         "agent_under_test": {
-            "endpoint": "http://127.0.0.1:8080",
-            "cmd": "python src/my_agent/server.py --host 127.0.0.1 --port 8080",
+            "endpoint": f"http://127.0.0.1:{agent_port}",
+            "cmd": f"python src/my_agent/server.py --host 127.0.0.1 --port {agent_port}",
         },
         "config": {
             "num_trials": trials,
@@ -241,8 +285,16 @@ def cmd_run(args: argparse.Namespace) -> None:
     print(f"[experiment] variant={args.variant} split={split} tasks/category={tasks} trials={trials}"
           f" model={args.model or env.get('AGENT_LLM', 'gemini/gemini-2.5-flash (default)')}")
     started_at = _now_utc()
+    # Capture provenance at START. Read after the run instead, a long run that
+    # spans an edit records the tree it finished next to rather than the tree
+    # it actually ran — which silently misattributes the result to code that
+    # never executed.
+    git_sha, git_dirty = _git("rev-parse", "--short", "HEAD"), bool(_git("status", "--porcelain"))
 
     shards = max(1, int(getattr(args, "shards", 1) or 1))
+    # Check every port this run will bind before spawning anything, so a
+    # collision surfaces as a collision rather than as an agent failure.
+    _preflight_ports([base_port + n for n in range(2 * shards)])
     if shards > 1:
         # The evaluator runs tasks sequentially (max_concurrency=1) and the work
         # is network-bound on the LLM proxy, so wall-clock scales ~1/N by
@@ -252,7 +304,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         shard_procs, shard_raws = [], []
         for i in range(shards):
             s_scenario = json.loads(json.dumps(scenario))  # deep copy
-            a_port, e_port = 8080 + 2 * i, 8081 + 2 * i
+            a_port, e_port = base_port + 2 * i, base_port + 1 + 2 * i
             s_scenario["agent_under_test"]["endpoint"] = f"http://127.0.0.1:{a_port}"
             s_scenario["agent_under_test"]["cmd"] = (
                 f"python src/my_agent/server.py --host 127.0.0.1 --port {a_port}")
@@ -332,8 +384,8 @@ def cmd_run(args: argparse.Namespace) -> None:
         "split": split,
         "tasks_per_category": tasks,
         "num_trials": trials,
-        "git_sha": _git("rev-parse", "--short", "HEAD"),
-        "git_dirty": bool(_git("status", "--porcelain")),
+        "git_sha": git_sha,
+        "git_dirty": git_dirty,
         "score": final.get("score"),
         "max_score": final.get("max_score"),
         "pass_rate": final.get("pass_rate"),
@@ -516,6 +568,9 @@ def main() -> None:
     p_run.add_argument("--vote", type=int, default=0, help="Self-consistency voting: K samples per turn (0 = off)")
     p_run.add_argument("--schema-guard", action="store_true", help="Deterministic tool-call schema validation + corrective regen")
     p_run.add_argument("--firewall", action="store_true", help="Deterministic action firewall (ledger + provenance + compiled policy constraints)")
+    p_run.add_argument("--base-port", type=int, default=8080,
+                       help="First port to bind (agent=N, evaluator=N+1). Raise it to run "
+                            "alongside another in-flight run (default 8080)")
     p_run.add_argument("--shards", type=int, default=1,
                        help="Split the task set across N parallel evaluator+agent pairs (~N x faster; the work is proxy-bound, not CPU-bound)")
     p_run.add_argument("--firewall-checks", default=None,

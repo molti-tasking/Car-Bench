@@ -14,6 +14,12 @@ without rebuilding the image):
     AGENT_PROMPT_VARIANT         named variant from prompts.py (default: baseline)
     AGENT_SYSTEM_PROMPT_PREFIX   optional free-text override of the variant prefix
     AGENT_SYSTEM_PROMPT_SUFFIX   optional free-text override of the variant suffix
+    AGENT_FIREWALL_CHECKS        comma-separated subset of the action-firewall
+                                 checks (precondition,default,provenance);
+                                 unset = all. For per-check ablation.
+    GUARD_EVENTS_PATH            optional JSONL path; when set, every guard and
+                                 firewall firing is appended for post-run
+                                 attribution (tools/experiment.py sets it)
 """
 import argparse
 import os
@@ -41,6 +47,7 @@ from a2a.server.routes import create_jsonrpc_routes, create_agent_card_routes
 from a2a.types import AgentCard
 
 from agent import MyAgentExecutor
+from firewall import CHECK_KINDS
 from observability import normalize_litellm_proxy_env, setup_tracing
 from prompts import PROMPT_VARIANTS
 
@@ -79,6 +86,22 @@ def prepare_agent_card(url: str) -> AgentCard:
     return card
 
 
+def _resolve_firewall_checks(raw: str | None) -> set:
+    """Parse AGENT_FIREWALL_CHECKS; unset/empty = every check. Unknown names
+    are a config error worth failing loudly on — silently running fewer checks
+    than intended would misattribute the whole ablation."""
+    if not raw or not raw.strip():
+        return set(CHECK_KINDS)
+    names = {n.strip() for n in raw.split(",") if n.strip()}
+    unknown = names - CHECK_KINDS
+    if unknown:
+        raise SystemExit(
+            f"AGENT_FIREWALL_CHECKS: unknown check(s) {sorted(unknown)}; "
+            f"valid: {sorted(CHECK_KINDS)}"
+        )
+    return names
+
+
 def resolve_config() -> dict:
     """Resolve all agent configuration from environment variables."""
     normalize_litellm_proxy_env()
@@ -110,6 +133,11 @@ def resolve_config() -> dict:
         "vote_temperature": float(os.getenv("AGENT_VOTE_TEMPERATURE", "0.7")),
         "schema_guard": os.getenv("AGENT_SCHEMA_GUARD", "false").lower() == "true",
         "firewall": os.getenv("AGENT_FIREWALL", "false").lower() == "true",
+        # Comma-separated subset of firewall.CHECK_KINDS; unset = all. Lets a
+        # single check be ablated without touching code — the `default` check
+        # in particular acts on an unverified LLM extraction of policy prose
+        # and needs to be measurable on its own.
+        "firewall_checks": _resolve_firewall_checks(os.getenv("AGENT_FIREWALL_CHECKS")),
         # For litellm_proxy/* models the proxy credentials come from the
         # normalized LITELLM_PROXY_* env vars; explicit AGENT_API_KEY/BASE
         # still override. Direct provider models (anthropic/..., gemini/...)
@@ -160,6 +188,7 @@ def main():
             vote_temperature=config["vote_temperature"],
             schema_guard=config["schema_guard"],
             firewall=config["firewall"],
+            firewall_checks=config["firewall_checks"],
         ),
         task_store=InMemoryTaskStore(),
         agent_card=card,

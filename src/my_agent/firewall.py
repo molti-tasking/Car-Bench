@@ -29,6 +29,10 @@ _VERBS = {
     "create", "delete", "update", "check", "find", "search", "list", "call",
     "toggle", "adjust", "increase", "decrease", "activate", "deactivate",
 }
+# The checks check_action() can run, individually selectable so each can be
+# measured on its own (see AGENT_FIREWALL_CHECKS).
+CHECK_KINDS = frozenset({"precondition", "default", "provenance"})
+
 _TRIVIAL_NUMBERS = {0.0, 1.0}
 _NUM_RE = re.compile(r"-?\d+(?:\.\d+)?")
 
@@ -74,12 +78,29 @@ class StateLedger:
     @classmethod
     def from_messages(cls, messages: list[dict]) -> "StateLedger":
         ledger = cls()
+        # Resolve each tool result to its call by id. Positional matching breaks
+        # whenever results arrive out of order or a batch comes back partially,
+        # and it fails silently — every later name in the episode shifts by one.
+        # The id map is authoritative; the positional queue is only a fallback
+        # for backends that omit tool_call_id.
+        by_id: dict[str, str] = {}
         pending: list[str] = []
         for m in messages:
             if m.get("role") == "assistant" and m.get("tool_calls"):
-                pending = [tc["function"]["name"] for tc in m["tool_calls"]]
+                pending = []
+                for tc in m["tool_calls"]:
+                    name = tc["function"]["name"]
+                    if tc.get("id"):
+                        by_id[tc["id"]] = name
+                    pending.append(name)
             elif m.get("role") == "tool":
-                name = pending.pop(0) if pending else "?"
+                call_id = m.get("tool_call_id")
+                if call_id and call_id in by_id:
+                    name = by_id[call_id]
+                    if name in pending:
+                        pending.remove(name)
+                else:
+                    name = pending.pop(0) if pending else "?"
                 raw = m.get("content") or ""
                 try:
                     payload = json.loads(raw) if isinstance(raw, str) else raw
@@ -187,9 +208,21 @@ def compile_constraints(policy_text: str, tools: list[dict], completion_fn,
 
 
 def check_action(tool_calls: list[dict], ledger: StateLedger, prov: ProvenanceIndex,
-                 constraints: dict | None) -> list[str]:
-    """Advisory violations for an outgoing set of tool calls."""
-    violations: list[str] = []
+                 constraints: dict | None, enabled: set | None = None) -> list[dict]:
+    """Advisory violations for an outgoing set of tool calls.
+
+    Returns [{"kind": <check name>, "message": <text for the nudge>}]. The kind
+    is what makes a run interpretable: without per-check attribution a flat
+    result cannot distinguish "never fired" from "fired and did not help".
+
+    `enabled` selects which checks run (default: all of CHECK_KINDS). The three
+    have very different risk profiles and must be measurable in isolation —
+    `default` contradicts the model on the strength of one unverified LLM
+    extraction of policy prose, while `provenance` is episode-global and may
+    turn out to be near-inert.
+    """
+    enabled = CHECK_KINDS if enabled is None else enabled
+    violations: list[dict] = []
     pre_map, default_map = {}, {}
     for p in (constraints or {}).get("preconditions", []):
         pre_map[p["tool"]] = [t for t in (p.get("requires_tools") or []) if isinstance(t, str)]
@@ -208,11 +241,14 @@ def check_action(tool_calls: list[dict], ledger: StateLedger, prov: ProvenanceIn
 
         # 1. Precondition: required tools must already have succeeded (or be in
         #    this same batch, which the evaluator executes in order).
-        for req in pre_map.get(name, []):
-            if not ledger.called(req) and req not in emitted:
-                violations.append(
-                    f"Policy precondition: '{req}' must succeed before '{name}', but it has not been called."
-                )
+        if "precondition" in enabled:
+            for req in pre_map.get(name, []):
+                if not ledger.called(req) and req not in emitted:
+                    violations.append({
+                        "kind": "precondition",
+                        "message": f"Policy precondition: '{req}' must succeed before '{name}', "
+                                   f"but it has not been called.",
+                    })
 
         for arg, val in args.items():
             if isinstance(val, bool) or not isinstance(val, (int, float)):
@@ -224,19 +260,26 @@ def check_action(tool_calls: list[dict], ledger: StateLedger, prov: ProvenanceIn
             #    licenses 100 for every component), so check the default
             #    directly — this is the 100%-instead-of-50% failure.
             default = default_map.get((name, arg))
-            if default is not None and abs(float(val) - float(default)) > 1e-9:
-                violations.append(
-                    f"Policy default: '{name}' argument '{arg}' defaults to {default}, but {val} was used. "
-                    f"Use the default unless the user explicitly asked for a different value."
-                )
+            if default is not None:
+                if "default" in enabled and abs(float(val) - float(default)) > 1e-9:
+                    violations.append({
+                        "kind": "default",
+                        "message": f"Policy default: '{name}' argument '{arg}' defaults to {default}, "
+                                   f"but {val} was used. Use the default unless the user explicitly "
+                                   f"asked for a different value.",
+                    })
+                # A policy-defined default is a stronger, more specific signal
+                # than episode-global provenance either way — do not also
+                # complain that the value is unsourced.
                 continue
 
             # 3. Provenance: a numeric argument with no source at all was invented.
-            if not prov.supports_number(val):
-                violations.append(
-                    f"Unsourced value: '{name}' argument '{arg}'={val} appears nowhere in the user's request, "
-                    f"the tool results, or the policy."
-                )
+            if "provenance" in enabled and not prov.supports_number(val):
+                violations.append({
+                    "kind": "provenance",
+                    "message": f"Unsourced value: '{name}' argument '{arg}'={val} appears nowhere in "
+                               f"the user's request, the tool results, or the policy.",
+                })
     return violations
 
 

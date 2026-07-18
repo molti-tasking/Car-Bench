@@ -41,8 +41,43 @@ needed.
 | `AGENT_PROMPT_VARIANT` | `baseline` | Named variant from `prompts.py` |
 | `AGENT_SYSTEM_PROMPT_PREFIX` | – | Free-text override of the variant prefix |
 | `AGENT_SYSTEM_PROMPT_SUFFIX` | – | Free-text override of the variant suffix |
+| `AGENT_SELF_CHECK` | `false` | Pre-send verification pass (**in the champion config**) |
+| `AGENT_ASK_GATE` | `false` | Preference-lookup nudge before clarifying questions |
+| `AGENT_VOTE_K` | `0` | Self-consistency voting (confirmed dead end — 71.1% at 3× tokens) |
+| `AGENT_SCHEMA_GUARD` | `false` | Deterministic tool-call schema validation + corrective regen |
+| `AGENT_FIREWALL` | `false` | Action firewall: ledger + provenance + compiled policy |
+| `AGENT_FIREWALL_CHECKS` | all | Ablate the firewall: subset of `precondition,default,provenance` |
+| `GUARD_EVENTS_PATH` | – | JSONL sink for guard firings (set per run by `experiment.py`) |
 
 The evaluator additionally needs `GEMINI_API_KEY`.
+
+## Measuring a guard, not just scoring it
+
+A guard that never fires and a guard that fires uselessly both show up as a
+flat Pass^3. `GUARD_EVENTS_PATH` separates them: every firing is logged with
+its mechanism and, for the firewall, the specific check that tripped. The
+experiment toolkit sets the path automatically and folds the counts into the
+run record as `guard_events`, so `runs.jsonl` can answer "did this mechanism
+have anything to act on?" before anyone argues about whether it helped.
+
+The firewall's three checks have very different risk profiles and should be
+measured separately before the full combination is trusted:
+
+- `precondition` — ordering rules from the compiled policy; low risk.
+- `default` — **highest risk**: it contradicts the model on the strength of a
+  single unverified LLM extraction of policy prose. One hallucinated default
+  rule fires on every matching action for the whole episode.
+- `provenance` — episode-global, so any number appearing anywhere in the
+  policy text licenses it everywhere; expect this one to fire rarely.
+
+```bash
+# Isolate the risky check before running the full firewall wide
+uv run python tools/experiment.py run --variant v4_german --self-check \
+    --firewall --firewall-checks precondition,provenance --tasks 15 --trials 3
+```
+
+Ablated runs get their own variant label (`…+firewall[precondition,provenance]`)
+so the leaderboard never compares two different agents under one name.
 
 ## Run
 
