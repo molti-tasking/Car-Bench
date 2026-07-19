@@ -1,8 +1,8 @@
 # Official submission scenario for my_agent.
-# Before submitting:
-#   1. Replace the agent image with your public GHCR image, pinned by DIGEST
-#      (docker inspect --format='{{index .RepoDigests 0}}' <image> after push).
-#   2. Pick the final AGENT_PROMPT_VARIANT default below.
+# Image published 2026-07-19 from main@aece15a (workflow run 29705053824),
+# digest-pinned below. Config: v4_german + self-check — validated public-test
+# Pass^3 71.3% / Pass@3 89.3%. The language ablation (v4_english, v4_spanish)
+# tied or trailed on matched test tasks; defaults stay on the champion.
 # Organizers provide evaluator secrets and the values for the agent env vars.
 
 [evaluator]
@@ -13,7 +13,7 @@ GEMINI_API_KEY = "${GEMINI_API_KEY:?Set GEMINI_API_KEY}"
 LOGURU_LEVEL = "${LOGURU_LEVEL:-INFO}"
 
 [agent_under_test]
-image = "ghcr.io/yourusername/car-bench-my-agent@sha256:replace_with_digest"
+image = "ghcr.io/molti-tasking/car-bench-my-agent@sha256:7fed0983ad69050dd7d53ae2dbfa63e255f8f995f98262d73b98b153fd8f3d03"
 
 [agent_under_test.env]
 AGENT_LLM = "${AGENT_LLM:?Set AGENT_LLM}"
