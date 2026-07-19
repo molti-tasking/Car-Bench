@@ -69,6 +69,10 @@ on:
         description: "List the proxy's available models instead of evaluating"
         default: false
         type: boolean
+      ghcr_validate:
+        description: "README Option C: run ghcr_smoke against the published image via docker compose"
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -145,6 +149,7 @@ jobs:
           SCHEMA_GUARD: ${{ inputs.schema_guard }}
           SHARDS: ${{ inputs.shards }}
           PROBE: ${{ inputs.probe }}
+          GHCR_VALIDATE: ${{ inputs.ghcr_validate }}
           ASK_GATE: ${{ inputs.ask_gate }}
         run: |
           set -euo pipefail
@@ -163,6 +168,19 @@ jobs:
           for p, n in sorted(passthrough.items()):
               print(f' - {p}/* ({n} passthrough models)')
           "
+            exit 0
+          fi
+          if [ "$GHCR_VALIDATE" = "true" ]; then
+            # README Option C: the published, digest-pinned image is pulled
+            # anonymously (proving public visibility) and runs one episode per
+            # category against the official evaluator image.
+            uv run python generate_compose.py --scenario scenarios/my_agent/ghcr_smoke.toml
+            printf 'LITE_LLM_API_KEY=%s\nLITE_LLM_API_BASE=%s\n' \
+              "$LITE_LLM_API_KEY" "$LITE_LLM_API_BASE" > .env
+            trap 'rm -f .env; docker compose -f scenarios/my_agent/docker-compose.yml down -v --remove-orphans 2>/dev/null || true' EXIT
+            docker compose --env-file .env -f scenarios/my_agent/docker-compose.yml up \
+              --abort-on-container-exit --pull always
+            echo "[ci] Option C GHCR validation completed"
             exit 0
           fi
           ARGS=(--variant "$VARIANT" --split "$SPLIT" --trials "$TRIALS")
