@@ -411,6 +411,8 @@ VARIANT_STATUS = {
     "v3_minimal": ("retired", "round 3: strong at 5 tasks/cat, faded at width"),
     "german_protocol": ("retired", "rounds 3-4: 100% on 5 tasks/cat did not survive 15 tasks/cat"),
     "v4_german": ("champion", "submission config (with self-check): test Pass^3 71.3%, +19.3pp over raw model"),
+    "v4_english": ("active", "language ablation: exact v4 rules in English"),
+    "v4_spanish": ("active", "language ablation: exact v4 rules in Spanish, English output"),
     "v5_german": ("retired", "round 6: tied champion Pass^3, lost the Pass@3 tiebreak"),
 }
 

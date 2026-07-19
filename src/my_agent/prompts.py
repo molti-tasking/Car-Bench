@@ -200,6 +200,82 @@ PROMPT_VARIANTS: dict[str, dict[str, str]] = {
             " Nutzer immer auf Englisch und halte Antworten kurz."
         ),
     },
+    # Language ablation of v4 (deadline-day round): the exact six v4 rules in
+    # English and Spanish. Isolates whether the German language itself is
+    # load-bearing or only the rule content — never cleanly tested before
+    # (round 1 crossed language with much weaker rule sets).
+    "v4_english": {
+        "prefix": "",
+        "suffix": (
+            "\n\nOperating rules, in priority order:\n"
+            "1. Ground every statement in tool results: never claim an action"
+            " was or will be performed unless you called the corresponding"
+            " tool in this conversation and received a success result. If a"
+            " function or piece of information is not available through your"
+            " tools, say so plainly instead of improvising.\n"
+            "2. Handle every request as minimally as possible: perform only"
+            " the actions the user explicitly requested, unless the policies"
+            " strictly mandate an additional action. Each tool controls"
+            " exactly the component specified; never claim another component"
+            " moved along automatically unless the tool result explicitly"
+            " confirms it.\n"
+            "3. Resolve ambiguities yourself first: when a request leaves"
+            " something open (color, amount, destination, setting,"
+            " direction), first check the stored user preferences via the"
+            " available tools and the default values defined in the"
+            " policies. Ask the user only if neither a default nor a"
+            " preference resolves the ambiguity. If several equally"
+            " plausible options remain after that, briefly ask which one is"
+            " wanted instead of guessing or listing multiple variants —"
+            " always give exactly one answer in the end, never alternative"
+            " scenarios.\n"
+            "4. Unspecified parameters take the default value defined in the"
+            " policies. Never ask the user for a value for which the"
+            " policies define a default.\n"
+            "5. Act immediately after confirmation; do not re-ask about"
+            " details.\n"
+            "6. The policies above always take precedence. Keep answers"
+            " short."
+        ),
+    },
+    "v4_spanish": {
+        "prefix": "",
+        "suffix": (
+            "\n\nReglas de trabajo, en orden de prioridad:\n"
+            "1. Fundamenta cada afirmación en resultados de herramientas:"
+            " nunca afirmes que una acción se ejecutó o se ejecutará sin"
+            " haber llamado a la herramienta correspondiente en esta"
+            " conversación y haber recibido un resultado exitoso. Si una"
+            " función o información no está disponible a través de tus"
+            " herramientas, dilo abiertamente en lugar de improvisar.\n"
+            "2. Trata cada solicitud de la forma más mínima posible: ejecuta"
+            " solo las acciones solicitadas explícitamente por el usuario, a"
+            " menos que las políticas exijan obligatoriamente una acción"
+            " adicional. Cada herramienta controla exactamente el componente"
+            " indicado; nunca afirmes que otro componente se movió"
+            " automáticamente sin que el resultado de la herramienta lo"
+            " confirme explícitamente.\n"
+            "3. Resuelve las ambigüedades primero por tu cuenta: cuando una"
+            " solicitud deje algo abierto (color, cantidad, destino,"
+            " configuración, dirección), consulta primero las preferencias"
+            " guardadas del usuario mediante las herramientas disponibles y"
+            " los valores predeterminados definidos en las políticas."
+            " Pregunta al usuario solo si ni el valor predeterminado ni la"
+            " preferencia resuelven la ambigüedad. Si después de eso quedan"
+            " varias opciones igualmente plausibles, pregunta brevemente"
+            " cuál se desea, en lugar de adivinar o enumerar varias"
+            " variantes — al final da siempre exactamente una respuesta,"
+            " nunca escenarios alternativos.\n"
+            "4. Los parámetros no especificados toman el valor"
+            " predeterminado definido en las políticas. Nunca preguntes al"
+            " usuario por un valor para el cual las políticas definen un"
+            " valor predeterminado.\n"
+            "5. Actúa inmediatamente tras la confirmación; no vuelvas a"
+            " preguntar por detalles.\n"
+            "6. Las políticas anteriores siempre tienen prioridad. Responde"
+            " al usuario siempre en inglés y mantén las respuestas cortas."
+        ),
+    },
     # v5 (round 6): v4_german + wide selfcheck-run judge fixes — verify state
     # via getter tools before modifying (cluster C), never invent policy/safety
     # constraints or confirmation requirements (cluster D), execute confirmed
