@@ -175,6 +175,9 @@ jobs:
             # anonymously (proving public visibility) and runs one episode per
             # category against the official evaluator image.
             uv run python generate_compose.py --scenario scenarios/my_agent/ghcr_smoke.toml
+            # the containers' non-root user must be able to write results into
+            # the bind-mounted output dir (uid mismatch on CI runners)
+            mkdir -p output && chmod -R 777 output
             printf 'LITE_LLM_API_KEY=%s\nLITE_LLM_API_BASE=%s\n' \
               "$LITE_LLM_API_KEY" "$LITE_LLM_API_BASE" > .env
             trap 'rm -f .env; docker compose -f scenarios/my_agent/docker-compose.yml down -v --remove-orphans 2>/dev/null || true' EXIT
