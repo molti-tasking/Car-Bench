@@ -99,7 +99,10 @@ jobs:
   evaluate:
     needs: matrix
     runs-on: ${{ inputs.runner }}
-    timeout-minutes: 350   # stay under the 6h hosted-runner ceiling
+    # Hosted runners die at 6h regardless, so cap just below it there. On
+    # self-hosted runners there is no platform ceiling — a full-test run under
+    # proxy contention has already been killed at 350 min once; give it a day.
+    timeout-minutes: ${{ inputs.runner == 'ubuntu-latest' && 350 || 1440 }}
     strategy:
       fail-fast: false     # one variant failing must not kill the rest
       matrix:
