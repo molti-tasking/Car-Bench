@@ -225,7 +225,12 @@ def cmd_run(args: argparse.Namespace) -> None:
         tasks = -1 if args.full else args.tasks
         trials = args.trials
 
-    variant_label = (args.variant + ("+selfcheck" if args.self_check else "")
+    variant_label = (args.variant
+                     + ("+selfcheck" if args.self_check else "")
+                     # cross-model verification must not share a label with
+                     # same-model self-check — different agents, one leaderboard
+                     + (f"[{args.self_check_model.split('/')[-1]}]"
+                        if args.self_check and args.self_check_model else "")
                      + ("+askgate" if args.ask_gate else "")
                      + ("+askgate2" if args.ask_gate_v2 else "")
                      + (f"+vote{args.vote}" if args.vote else "")
@@ -296,6 +301,8 @@ def cmd_run(args: argparse.Namespace) -> None:
         env["AGENT_LLM"] = args.model
     if args.self_check:
         env["AGENT_SELF_CHECK"] = "true"
+    if args.self_check_model:
+        env["AGENT_SELF_CHECK_MODEL"] = args.self_check_model
     if args.ask_gate and args.ask_gate_v2:
         sys.exit("--ask-gate and --ask-gate-v2 are mutually exclusive")
     if args.ask_gate:
@@ -600,6 +607,7 @@ def main() -> None:
     p_run.add_argument("--trials", type=int, default=1, help="Trials per task (3 needed for Pass^3)")
     p_run.add_argument("--model", default=None, help="Override AGENT_LLM for this run")
     p_run.add_argument("--self-check", action="store_true", help="Enable the agent's pre-send self-check pass")
+    p_run.add_argument("--self-check-model", default=None, help="Different model for the self-check pass (cross-model verification)")
     p_run.add_argument("--ask-gate", action="store_true", help="Enable the preference-lookup nudge before clarifying questions")
     p_run.add_argument("--ask-gate-v2", action="store_true", help="Ask-gate v2: fires only on genuine clarification questions, never confirmations")
     p_run.add_argument("--vote", type=int, default=0, help="Self-consistency voting: K samples per turn (0 = off)")

@@ -56,6 +56,9 @@ on:
         default: "off"
         type: choice
         options: ["off", "v1", "v2"]
+      self_check_model:
+        description: "Different model for the self-check pass (cross-model verification)"
+        default: ""
       runner:
         description: "Runner label (ubuntu-latest, or your self-hosted label)"
         default: "ubuntu-latest"
@@ -151,6 +154,7 @@ jobs:
           PROBE: ${{ inputs.probe }}
           GHCR_VALIDATE: ${{ inputs.ghcr_validate }}
           ASK_GATE: ${{ inputs.ask_gate }}
+          SELF_CHECK_MODEL: ${{ inputs.self_check_model }}
         run: |
           set -euo pipefail
           if [ "$PROBE" = "true" ]; then
@@ -194,6 +198,7 @@ jobs:
           if [ "$SCHEMA_GUARD" = "true" ]; then ARGS+=(--schema-guard); fi
           if [ "$ASK_GATE" = "v1" ]; then ARGS+=(--ask-gate); fi
           if [ "$ASK_GATE" = "v2" ]; then ARGS+=(--ask-gate-v2); fi
+          if [ -n "$SELF_CHECK_MODEL" ]; then ARGS+=(--self-check-model "$SELF_CHECK_MODEL"); fi
           if [ -n "$FIREWALL_CHECKS" ]; then ARGS+=(--firewall-checks "$FIREWALL_CHECKS"); fi
           echo "[ci] experiment.py run ${ARGS[*]}"
           uv run python tools/experiment.py run "${ARGS[@]}"
