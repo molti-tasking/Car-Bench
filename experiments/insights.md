@@ -174,3 +174,58 @@ cites run evidence. The leaderboard says *what* won; this file says *why*.
 - Same-model user-sim (GLM sim for GLM agent): watch for correlated blind
   spots; revalidate finalists with the official Gemini fixture before any
   submission decision.
+
+## 2026-07-19 — Deadline-day screens: every alternative ties or loses
+
+- **Ask-gate v2 (clarify-only trigger): active but no lift.** Fired 34× across
+  37 contexts (the confirmation-question filter worked), Pass^3 66.7%,
+  disambiguation unchanged (46.7%) — the missing-preference-lookup hypothesis
+  is now dead twice. Record Pass@3 95.6%: the gate raises capability coverage
+  while lowering consistency — the benchmark's core pathology in one number.
+- **Model swap (kimi-k2.5 under the champion harness): exact tie.** Pass^3
+  68.9%, Pass@3 88.9% — identical to the GLM re-run. The harness is
+  model-portable nearly loss-free; the model is not the current lever.
+  (Caveat: kimi also judges, same-model-judge bias possible.)
+- **Language ablation (exact v4 rules translated):** german 73.3/68.9,
+  spanish 73.3 (train disambiguation record 66.7), english 66.7 (worst,
+  disambiguation 40). Language redistributes category strengths more than it
+  moves the total.
+- **Spanish full-test, salvaged:** the sharded run wedged (1 of 3 shards
+  finished); shard 1 gave 42 test tasks × 3 trials. Matched-task comparison
+  against the champion's validated full-test: **31/42 vs 31/42 — an exact
+  tie**, each side uniquely winning 2 tasks. The train disambiguation spike
+  did not reproduce → train-subset artifact, the same trap as round 5.
+- **Verdict: v4_german + self-check stays the submission config.** Rule
+  content sets the level; prompt language (German vs Spanish) is
+  interchangeable within noise; English measures slightly weaker.
+
+## 2026-07-19/20 — Infrastructure post-mortem (paid in lost compute)
+
+- Three runs died at timeouts (~18h compute, zero results): two at the hosted
+  6h ceiling, one killed by our own `timeout-minutes: 350` applying to the
+  self-hosted runner too. Results are written only at run end, so a kill at
+  97% equals a kill at 1%. Fixed: 24h self-hosted cap, evals serialized,
+  full-tests never on hosted runners. Open improvement: incremental
+  per-task result flushing.
+- **The proxy is the throughput ceiling.** Concurrent evaluations halve each
+  other; sharding gains ~nothing under saturation; a full test is ~6h at
+  current GLM throughput no matter how it is sliced. Raising proxy throughput
+  beats any CI optimization.
+- Sharded runs add a silent-wedge failure mode (one shard hung ~2h after the
+  others finished — dead-provider-connection class). Salvage path that
+  worked: per-shard raw JSONs + mining per-task ✓/✗ lines from job logs.
+- **Option C validation earned its keep twice**: caught the package being
+  effectively private (anonymous pull `unauthorized` — exactly what the
+  organizers would have hit), and a container-uid write failure. Automated as
+  the `ghcr_validate` workflow mode.
+- New instrumentation shipped (all env-gated, unmeasured pending screens):
+  `--ask-gate-v2`, `--self-check-model` (cross-model verification), git-native
+  queue dispatcher (`.ci/queue.json` push → run) for API-less environments.
+
+## 2026-07-19 — Submission (Track 1)
+
+- Image `ghcr.io/molti-tasking/car-bench-my-agent@sha256:7fed0983…` (public,
+  digest-pinned, Option C validated: anonymous pull + episodes vs official
+  evaluator). Config via `scenarios/my_agent/submission.toml` env defaults:
+  v4_german + self-check, temperature 0. Validated public-test Pass^3 71.3%,
+  Pass@3 89.3%, +19.3pp over the raw model.

@@ -43,6 +43,7 @@ needed.
 | `AGENT_SYSTEM_PROMPT_SUFFIX` | – | Free-text override of the variant suffix |
 | `AGENT_SELF_CHECK` | `false` | Pre-send verification pass (**in the champion config**) |
 | `AGENT_ASK_GATE` | `false` | Preference-lookup gate before clarifying questions: `true`/`v1` = any question, `v2` = only genuine clarification questions (confirmations pass through) |
+| `AGENT_SELF_CHECK_MODEL` | – | Different model for the self-check pass (cross-model verification) |
 | `AGENT_VOTE_K` | `0` | Self-consistency voting (confirmed dead end — 71.1% at 3× tokens) |
 | `AGENT_SCHEMA_GUARD` | `false` | Deterministic tool-call schema validation + corrective regen |
 | `AGENT_FIREWALL` | `false` | Action firewall: ledger + provenance + compiled policy |
