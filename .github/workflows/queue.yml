@@ -5,6 +5,10 @@ name: Queue dispatcher
 # API is unavailable. The JSON holds any evaluate.yml inputs (strings/bools)
 # plus a free-form "nonce" to force a change on repeat runs.
 
+permissions:
+  contents: write   # the called workflow's publish job commits the registry back
+  actions: read
+
 on:
   push:
     branches: [main]
