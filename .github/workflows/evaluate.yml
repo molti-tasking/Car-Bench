@@ -15,6 +15,26 @@ name: Evaluate agent variants
 # self-hosted runner — set the `runner` input to your runner's label.
 
 on:
+  # Same inputs twice: workflow_dispatch for manual/API runs, workflow_call so
+  # queue.yml can launch evaluations from a plain git push of .ci/queue.json
+  # (API dispatch is not always available from every tool environment).
+  workflow_call:
+    inputs:
+      variants: { type: string, default: "baseline,v4_german" }
+      split: { type: string, default: "train" }
+      tasks: { type: string, default: "15" }
+      trials: { type: string, default: "3" }
+      self_check: { type: boolean, default: true }
+      firewall: { type: boolean, default: false }
+      firewall_checks: { type: string, default: "" }
+      schema_guard: { type: boolean, default: false }
+      ask_gate: { type: string, default: "off" }
+      self_check_model: { type: string, default: "" }
+      runner: { type: string, default: "ubuntu-latest" }
+      agent_llm: { type: string, default: "litellm_proxy/natai/glm" }
+      shards: { type: string, default: "1" }
+      probe: { type: boolean, default: false }
+      ghcr_validate: { type: boolean, default: false }
   workflow_dispatch:
     inputs:
       variants:

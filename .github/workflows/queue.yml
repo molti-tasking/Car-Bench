@@ -1,0 +1,72 @@
+name: Queue dispatcher
+
+# Launch an evaluation by pushing .ci/queue.json to main — a git-native
+# alternative to workflow_dispatch for tool environments where the Actions
+# API is unavailable. The JSON holds any evaluate.yml inputs (strings/bools)
+# plus a free-form "nonce" to force a change on repeat runs.
+
+on:
+  push:
+    branches: [main]
+    paths: ['.ci/queue.json']
+
+jobs:
+  params:
+    runs-on: ubuntu-latest
+    outputs:
+      variants: ${{ steps.q.outputs.variants }}
+      split: ${{ steps.q.outputs.split }}
+      tasks: ${{ steps.q.outputs.tasks }}
+      trials: ${{ steps.q.outputs.trials }}
+      self_check: ${{ steps.q.outputs.self_check }}
+      firewall: ${{ steps.q.outputs.firewall }}
+      firewall_checks: ${{ steps.q.outputs.firewall_checks }}
+      schema_guard: ${{ steps.q.outputs.schema_guard }}
+      ask_gate: ${{ steps.q.outputs.ask_gate }}
+      self_check_model: ${{ steps.q.outputs.self_check_model }}
+      runner: ${{ steps.q.outputs.runner }}
+      agent_llm: ${{ steps.q.outputs.agent_llm }}
+      shards: ${{ steps.q.outputs.shards }}
+      probe: ${{ steps.q.outputs.probe }}
+      ghcr_validate: ${{ steps.q.outputs.ghcr_validate }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: q
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          q = json.load(open('.ci/queue.json'))
+          d = {"variants": "baseline", "split": "train", "tasks": "15",
+               "trials": "3", "self_check": "true", "firewall": "false",
+               "firewall_checks": "", "schema_guard": "false",
+               "ask_gate": "off", "self_check_model": "",
+               "runner": "self-hosted",
+               "agent_llm": "litellm_proxy/natai/glm", "shards": "1",
+               "probe": "false", "ghcr_validate": "false"}
+          for k, v in q.items():
+              if k in d:
+                  d[k] = str(v).lower() if isinstance(v, bool) else str(v)
+          for k, v in d.items():
+              print(f"{k}={v}")
+          PY
+
+  run:
+    needs: params
+    uses: ./.github/workflows/evaluate.yml
+    secrets: inherit
+    with:
+      variants: ${{ needs.params.outputs.variants }}
+      split: ${{ needs.params.outputs.split }}
+      tasks: ${{ needs.params.outputs.tasks }}
+      trials: ${{ needs.params.outputs.trials }}
+      self_check: ${{ fromJSON(needs.params.outputs.self_check) }}
+      firewall: ${{ fromJSON(needs.params.outputs.firewall) }}
+      firewall_checks: ${{ needs.params.outputs.firewall_checks }}
+      schema_guard: ${{ fromJSON(needs.params.outputs.schema_guard) }}
+      ask_gate: ${{ needs.params.outputs.ask_gate }}
+      self_check_model: ${{ needs.params.outputs.self_check_model }}
+      runner: ${{ needs.params.outputs.runner }}
+      agent_llm: ${{ needs.params.outputs.agent_llm }}
+      shards: ${{ needs.params.outputs.shards }}
+      probe: ${{ fromJSON(needs.params.outputs.probe) }}
+      ghcr_validate: ${{ fromJSON(needs.params.outputs.ghcr_validate) }}
