@@ -240,9 +240,9 @@ cites run evidence. The leaderboard says *what* won; this file says *why*.
   largest within-configuration spread, twice the champion's 4.4pp.
   "German weakly dominates every paired comparison" is overturned; the
   correct claim is a replicated null: rule content sets the level, language
-  is interchangeable within noise. Category profile (hallucination
-  strongest, disambiguation weakest) is stable across all 7 language-arm
-  runs — the disambiguation ceiling is language-independent.
+  is interchangeable within noise. Disambiguation is the weakest
+  category in every language-arm run (base is strongest in 5 of 6
+  registered screens) — the disambiguation ceiling is language-independent.
 - **Cross-model verification: first measurement, campaign-best screen.**
   Champion unchanged, self-check verifier swapped to kimi-k2.5:
   **Pass^3 77.8%, Pass@3 88.9** (`20260727-042503`) — above every champion
