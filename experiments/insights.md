@@ -229,3 +229,37 @@ cites run evidence. The leaderboard says *what* won; this file says *why*.
   evaluator). Config via `scenarios/my_agent/submission.toml` env defaults:
   v4_german + self-check, temperature 0. Validated public-test Pass^3 71.3%,
   Pass@3 89.3%, +19.3pp over the raw model.
+
+## 2026-07-27 — Post-submission replication round (hosted CI, serialized dispatches)
+
+- **Language ablation replicated — the German advantage is dead.** English
+  replicate 2: **Pass^3 75.6%** (`20260727-001241`), above every German
+  champion replicate (73.3/68.9/68.9); Spanish replicate 2: 68.9%
+  (`20260727-001244`). Per-language means 70.4/71.1/71.1 —
+  indistinguishable. The 8.9pp English swing (66.7→75.6) is the campaign's
+  largest within-configuration spread, twice the champion's 4.4pp.
+  "German weakly dominates every paired comparison" is overturned; the
+  correct claim is a replicated null: rule content sets the level, language
+  is interchangeable within noise. Category profile (hallucination
+  strongest, disambiguation weakest) is stable across all 7 language-arm
+  runs — the disambiguation ceiling is language-independent.
+- **Cross-model verification: first measurement, campaign-best screen.**
+  Champion unchanged, self-check verifier swapped to kimi-k2.5:
+  **Pass^3 77.8%, Pass@3 88.9** (`20260727-042503`) — above every champion
+  replicate, hallucination Pass^1 100%, token-cost parity (6.10M vs ~6.2M).
+  Caveats: single run; margin (+4.4 vs best replicate) sits inside the
+  observed 4.4–8.9pp spread band; kimi also serves as the benchmark's
+  failure judge (correlated-judge bias possible). A lead to confirm, not a
+  result — but the only intervention measured that moved the total *up*,
+  consistent with "independent verifier disagrees with the actor's
+  systematic errors where K samples agree with them".
+- **Ops**: proxy ran at ~1/3 historical throughput (~34 rows/h per job
+  shared, ~41 solo); 15×3 screens took 3.9–4.2h shared / 3.3h solo — still
+  inside the hosted 350-min cap, validating screening-width-only on hosted
+  runners. Ref-scoped concurrency serialized two dispatches cleanly, but
+  queue wait pushed total wall-clock past 6h — deadline campaigns should
+  budget queue time, not just run time.
+- Report updated accordingly (IJCAI repo, commits `5b856cd`, `c97a240`):
+  language section rewritten as replicated null, firewall row corrected to
+  measured tie, new "What might: cross-model verification" paragraph +
+  Table 1 row 5'.
